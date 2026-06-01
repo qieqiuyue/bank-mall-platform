@@ -1,16 +1,19 @@
-# Dependencies
-node_modules/
-.gradle/
+# === Dependencies & Cache ===
+**/node_modules/
+**/.gradle/
+**/maven-wrapper.jar
 
-# Build artifacts
-target/
+# === Build Artifacts ===
+**/target/
 *.jar
 *.war
+*.class
+*.original
 build/
 dist/
 out/
 
-# IDE files
+# === IDE ===
 .idea/
 .vscode/
 *.iml
@@ -21,28 +24,32 @@ out/
 .classpath
 .settings/
 
-# OS files
+# === OS ===
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# Docker
-docker-compose.override.yml
-*.tar
+# === Docs & Project-level (not needed in build context) ===
+**/*.md
+.git/
+.gitignore
+.dockerignore
+.gitattributes
+docs/
+scripts/
+.github/
+*.log
+*.tmp
 
-# Secrets (CRITICAL)
+# === Secrets (CRITICAL — never in image) ===
 **/secret.yaml
 **/secrets.yaml
 *.pem
 *.key
 *.crt
-!*.example
-!*.sample
+*.env
+.env.*
 
-# Terraform
-.terraform/
-*.tfstate*
-
-# Temporary files
-*.log
-*.tmp
-/tmp/
+# === Docker ===
+docker-compose.override.yml
+*.tar

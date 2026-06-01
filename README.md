@@ -1,112 +1,155 @@
 # Bank Mall Cloud-Native Platform
 
-某城商行电子商城云原生平台 — 独立设计并交付的完整平台工程项目。
+> 某城商行电子商城云原生平台 — 独立设计并交付的完整平台工程项目。
+> **当前状态：S0 初始化中** | 架构已定稿，按 6 阶段执行计划增量交付。
 
-## 项目概述
+![Java](https://img.shields.io/badge/Java_17-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.2-6DB33F?logo=spring&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes_v1.36-326CE5?logo=kubernetes&logoColor=white)
+![ArgoCD](https://img.shields.io/badge/ArgoCD-EF7B4D?logo=argo&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-3DA639)
 
-以一个银行电子商城的真实业务场景为载体，从裸金属服务器搭建 Kubernetes 集群开始，完成微服务容器化、CI/CD 自动化流水线、GitOps 声明式部署、全栈可观测性体系（指标 / 日志 / 链路追踪）、安全策略加固，并开发核心微服务验证平台业务承载能力。
+![S0](https://img.shields.io/badge/Phase-S0_Init-important)
+![S1](https://img.shields.io/badge/Phase-S1_Business-inactive)
+![S2](https://img.shields.io/badge/Phase-S2_Platform-inactive)
+![S3](https://img.shields.io/badge/Phase-S3_CICD-inactive)
+![S4](https://img.shields.io/badge/Phase-S4_Chaos-inactive)
+![S5](https://img.shields.io/badge/Phase-S5_Polish-inactive)
 
-**定位**：平台工程 / SRE，非单纯的业务后端开发。
+---
+
+## 项目定位
+
+以银行电子商城为业务背景，从裸金属服务器搭建 Kubernetes 集群开始，完成微服务容器化、CI/CD 流水线、GitOps 声明式部署、全栈可观测性体系（指标 / 日志 / 链路追踪）、安全策略加固，并开发核心微服务验证平台承载能力。
+
+**定位**：平台工程 / SRE — Java 代码是验证平台能力的手段，不是叙事主体。
+
+本仓库按 `docs/execution-plan.md` 中定义的 6 阶段计划（S0-S5）增量构建。
 
 ## 业务背景
 
-某城商行电子渠道系统包含用户认证、账户管理、支付处理和消息通知等核心能力。传统部署方式依赖手工发布，存在版本不可控、扩容不灵活、故障影响范围大、日志和监控分散等问题。
-
-本项目以该场景为背景，将系统拆分为多个 Spring Boot 微服务，基于 Kubernetes 进行容器化部署改造，逐步补齐镜像管理、服务发布、配置管理、弹性伸缩、监控告警、日志采集和安全加固能力。
+某城商行电子渠道系统包含用户认证、账户管理、支付处理和消息通知等核心能力。本项目将系统拆分为 4 个 Spring Boot 微服务，基于 Kubernetes 进行容器化部署改造，补齐镜像管理、弹性伸缩、监控告警、日志采集、链路追踪和安全加固能力。
 
 ## 技术栈
 
-`Spring Boot 3.1` `Java 17` `Docker` `Kubernetes v1.36` `kubeadm` `containerd` `Calico` `Harbor` `Ingress Nginx` `Helm` `ArgoCD` `GitHub Actions` `GitLab CI` `Trivy` `Gitleaks` `Sealed Secrets` `Prometheus` `Grafana` `Loki` `Promtail` `Jaeger` `Velero` `MySQL`
-
-## 平台能力总览
-
-| 能力域 | 核心组件 | 说明 |
-|--------|---------|------|
-| **容器编排** | Kubernetes v1.36 (kubeadm) | 1 control plane + 2 worker，containerd 运行时，Calico CNI |
-| **镜像管理** | Harbor | 私有镜像仓库，多阶段 Docker 构建，非 root 运行 |
-| **流量管理** | Ingress Nginx | 统一入口，路径路由，DaemonSet + hostNetwork |
-| **弹性伸缩** | HPA | CPU 70% 触发，min=1 max=3，scaleDown 冷却 5min |
-| **CI/CD** | GitHub Actions + GitLab CI | 双平台分层验证：公网代码门禁 + 内网镜像安全交付 |
-| **GitOps** | ArgoCD | 声明式部署，自动同步，selfHeal + prune |
-| **应用配置** | Helm | dev / staging / prod 三环境 values 覆盖 |
-| **安全扫描** | Trivy + Gitleaks | 镜像漏洞扫描 (hard gate) + 密钥泄露检测 (pre-commit + CI) |
-| **凭证管理** | Sealed Secrets | GitOps 友好的加密 Secret，Git 中零明文 |
-| **网络策略** | NetworkPolicy | deny-all + 白名单规则，最小权限通信 |
-| **Pod 安全** | PodSecurity (baseline) | 禁止特权容器、hostPath 限制 |
-| **监控告警** | Prometheus + Grafana | 基础设施指标 + 业务指标 (QPS/成功率/P99) + SLI/SLO |
-| **日志聚合** | Loki + Promtail | 3 个命名空间日志采集，LogQL 查询 |
-| **链路追踪** | Jaeger + OpenTelemetry | 跨服务调用链可视化，瓶颈定位 |
-| **备份恢复** | Velero | MySQL 备份 + 删库恢复演练 |
-| **通知** | 飞书 Bot | 交互卡片通知，CI/CD 状态 + 告警推送 |
+| 领域 | 选型 | 说明 |
+|------|------|------|
+| 语言 | Java 17 LTS | 稳定优先 |
+| 框架 | Spring Boot 3.2+ | RestClient 作为同步 HTTP 客户端 |
+| 网关 | Ingress Nginx | K8s 原生，DaemonSet + hostNetwork |
+| 服务发现 | K8s CoreDNS + Service | 无需额外注册中心 |
+| 容器运行时 | containerd + Calico | CNI |
+| 镜像仓库 | Harbor | 私有仓库 |
+| CI/CD | GitHub Actions + 内网 ci.sh | 双平台分层验证 |
+| GitOps | ArgoCD | auto-sync + selfHeal + prune |
+| Secret 管理 | Sealed Secrets | GitOps 原生加密 |
+| 链路追踪 | Jaeger all-in-one + Badger + PVC | 零外部依赖 |
+| 指标监控 | Prometheus + Micrometer + Grafana | 基础设施 + 业务指标 |
+| 日志聚合 | Loki + Promtail | 轻量级日志方案 |
+| 安全扫描 | Semgrep + Trivy + Gitleaks | SAST + 镜像 + 密钥三重门禁 |
+| 通知 | 飞书 Bot | CI/CD 状态 + 告警推送 |
+| 数据库 | MySQL 8.0 | 每服务独立数据库 |
+| 分布式事务 | 补偿逻辑 + 最终一致性 | 冲正 + 重试 + 人工兜底 |
 
 ## 微服务架构
 
 | 服务 | 端口 | 职责 | 关键接口 |
 |------|------|------|---------|
-| **auth-service** | 8081 | 用户认证与授权 | `POST /login` `POST /validate` `GET /users/{id}` |
-| **account-service** | 8082 | 账户管理与流水记录 | `GET /{id}/balance` `POST /{id}/debit` `POST /{id}/credit` |
-| **payment-service** | 8083 | 支付处理与状态流转 | `POST /payments` `GET /payments/{id}` |
-| **notification-service** | 8084 | 通知记录与发送 | `POST /notifications` `GET /notifications/templates` |
+| **auth-service** | 8081 | 用户认证与授权 | `POST /login` `POST /validate` |
+| **account-service** | 8082 | 账户管理与交易流水 | `GET /{id}/balance` `POST /{id}/debit` `POST /{id}/credit` |
+| **payment-service** | 8083 | 支付处理与补偿 | `POST /payments` `GET /payments/{id}` |
+| **notification-service** | 8084 | 通知记录 | `POST /notifications` |
 
-调用链路：`Ingress → payment-service → account-service (扣款/入账) → notification-service (通知)`
+调用链路：`Ingress → payment-service → account-service (debit/credit) → notification-service`
 
 ## 集群拓扑
 
-| 节点 | 角色 | OS | 规格 |
-|------|------|-----|------|
-| k8s-master01 | Control Plane | Ubuntu 24.04 | 4C/8G |
-| k8s-worker01 | Worker | Ubuntu 24.04 | 4C/8G |
-| k8s-worker02 | Worker | Ubuntu 24.04 | 4C/8G |
-| harbor01 | Harbor Registry | Ubuntu 24.04 | 2C/4G |
+| 节点 | 角色 | IP | OS | 规格 |
+|------|------|-----|-----|------|
+| k8s-master01 | Control Plane | 10.0.0.31 | Ubuntu 24.04 | 4C/8G |
+| k8s-worker01 | Worker | 10.0.0.41 | Ubuntu 24.04 | 4C/8G |
+| k8s-worker02 | Worker | 10.0.0.42 | Ubuntu 24.04 | 4C/8G |
+| harbor01 | Harbor Registry | 10.0.0.61 | Ubuntu 24.04 | 2C/4G |
+
+> ⚠️ 实验环境（VMware NAT）。网络约束：中国内地 GFW，K8s 组件用阿里云镜像源。
+
+## 项目结构
+
+```text
+bank-mall-platform/
+├── bank-digital-platform/         # Spring Boot 微服务源码
+│   ├── pom.xml                    #   父 POM
+│   ├── auth-service/              #   端口 8081
+│   ├── account-service/           #   端口 8082
+│   ├── payment-service/           #   端口 8083
+│   └── notification-service/      #   端口 8084
+├── k8s/                           # Kubernetes 清单
+│   └── base/
+│       ├── mysql/                 #   StatefulSet + PV/PVC
+│       ├── *-service/             #   4 服务 Deployment + Service + HPA
+│       ├── ingress/               #   Ingress Nginx
+│       ├── monitoring/            #   Prometheus / Grafana / Loki
+│       ├── security/              #   NetworkPolicy + PodSecurity
+│       └── sealed-secrets/        #   加密 Secret
+├── helm/                          # Helm Charts
+├── scripts/                       # 运维脚本
+├── .github/workflows/             # GitHub Actions CI
+├── docs/                          # 技术文档
+├── Makefile
+├── ROADMAP.md
+├── CONTRIBUTING.md
+└── LICENSE
+```
+
+## 执行阶段
+
+| 阶段 | 焦点 | 状态 | 关键产出 |
+|------|------|------|---------|
+| **S0** | 平台抢救与验证 | 🔵 进行中 | 集群恢复、SB 3.2 验证、工程基础 |
+| **S1** | 业务最小闭环 | ⚪ 规划中 | auth JWT、account/payment/notification 服务 |
+| **S2** | 平台能力矩阵 | ⚪ 规划中 | ArgoCD、Jaeger、Grafana、Sealed Secrets |
+| **S3** | 双平台 CI/CD | ⚪ 规划中 | GitHub Actions + 内网 ci.sh |
+| **S4** | 故障演练与压测 | ⚪ 规划中 | 3 次故障复盘、JMeter 报告 |
+| **S5** | 润色与包装 | ⚪ 规划中 | Swagger、Helm、面试材料 |
+
+详见 `docs/execution-plan.md`。
+
+## Git 提交约定
+
+| 前缀 | 用途 | 前缀 | 用途 |
+|------|------|------|------|
+| `[INIT]` | 项目初始化 | `[OBS]` | 可观测性 |
+| `[FEAT]` | 新功能 | `[TRACE]` | 链路追踪 |
+| `[FIX]` | Bug 修复 | `[SEC]` | 安全加固 |
+| `[TEST]` | 测试 | `[DEPLOY]` | 部署 |
+| `[CI]` | CI/CD | `[CHAOS]` | 故障演练 |
+| `[API]` | API 文档 | `[PERF]` | 性能测试 |
+| `[DOC]` | 文档 | `[MIGRATE]` | 代码迁移 |
 
 ## 快速开始
 
 ```bash
-# 本地开发（仅需 Docker）
-docker-compose up -d    # 启动 MySQL
+# 当前状态（S0 初始化中）
+# 完整启动需要：4 台 Ubuntu 24.04 VM + Kubernetes v1.36 集群 + Harbor
 
-# 构建并推送镜像到 Harbor
-bash scripts/build-images.sh
-
-# 部署到 K8s
-bash scripts/deploy.sh
-
-# 一键 CI/CD（lint → test → build → scan → push → deploy → verify）
-bash scripts/ci.sh
+# S0 完成后可用：
+make help          # 查看所有可用目标
+make preflight     # 部署前验证
+make smoke-test    # 烟雾测试
+make ci            # 一键内网 CI/CD
 ```
 
 ## 文档索引
 
-| # | 文档 | 内容 |
-|---|------|------|
-| 00 | 项目概述 | 项目定位、业务背景、架构总览 |
-| 01 | 快速开始 | 最小化环境搭建，5 分钟跑通 |
-| 02 | 环境拓扑与规划 | 集群拓扑、网络规划、资源分配 |
-| 03 | 集群搭建手册 | kubeadm + containerd + Calico 完整步骤 |
-| 04 | 微服务开发指南 | 业务设计、数据模型、API 清单 |
-| 05 | 容器化与镜像管理 | Dockerfile 多阶段构建 + Harbor |
-| 06 | K8s 部署详解 | Deployment/Service/ConfigMap/Ingress/HPA |
-| 07 | CI/CD 流水线 | GitHub Actions + 内网 CI + Trivy + Gitleaks |
-| 08 | GitOps 与 Helm | ArgoCD + Helm 多环境管理 |
-| 09 | 可观测性体系 | Prometheus + Grafana + Loki + Jaeger |
-| 10 | 安全策略 | NetworkPolicy + PodSecurity + Sealed Secrets |
-| 11 | 排障手册 | 常见问题 + 踩坑记录 + 诊断命令 |
-| 12 | 设计决策日志 | 技术选型理由 + 架构权衡 |
-| 13 | 故障演练复盘 | OOMKilled / NetworkPolicy / 慢调用 3 场景 |
-
-## 项目状态
-
-**当前阶段**：V1 基线 — 4 个微服务可运行 + K8s 全栈部署 + CI/CD 双平台闭环 + 全栈可观测 + 3 轮故障演练
-
-后续规划（V2）：多 master 高可用集群、Argo Rollouts 灰度发布、Kyverno 自定义策略、OpenTelemetry 全量集成。
-
-## 设计原则
-
-- **平台交付视角**：关注“这个平台能承载什么业务”而非“这个业务怎么实现”
-- **面试可追问**：每个技术决策背后都有明确的选型理由和权衡分析
-- **诚实边界**：明确标注实验环境与生产方案的差异，不包装成真实生产系统
-- **代码即文档**：配置文件注释充分，关键设计决策写入设计决策日志
+| 文档 | 内容 |
+|------|------|
+| `docs/execution-plan.md` | S0-S6 完整执行计划 |
+| `docs/04-architecture.md` | 架构图与组件说明 |
+| `ROADMAP.md` | 能力状态、V2 规划、技术取舍 |
+| `CONTRIBUTING.md` | 提交约定、分支策略、PR 流程 |
 
 ---
 
-**独立完成** | [GitHub](https://github.com/qianqiuyue/bank-mall-platform)
+**独立完成** | [GitHub](https://github.com/qieqiuyue/bank-mall-platform) | 实验环境，非生产系统

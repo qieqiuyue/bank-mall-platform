@@ -1,34 +1,76 @@
-# Maven
-target/
+# === Java / Maven ===
+**/target/
 *.jar
 *.war
 *.class
+*.original
+**/dependency-reduced-pom.xml
+maven-wrapper.jar
 
-# IDE
+# === IDE ===
 .idea/
 .vscode/
 *.iml
+*.ipr
+*.iws
 .project
 .classpath
 .settings/
+*.swp
+*.swo
+*~
 
-# Docker
-*.tar
-
-# OS
+# === OS ===
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# Secrets — NEVER commit
-k8s/base/secret.yaml
+# === Docker ===
+*.tar
+docker-compose.override.yml
+
+# === Secrets — NEVER commit ===
+**/secret.yaml
+**/secrets.yaml
 *.pem
 *.key
+*.crt
+*.cert
+*.p12
 credentials.yml
+*.env
+.env.*
+!.env.example
+**/.kube/
+kubeconfig
+secrets/
 
-# Node (if any tooling)
+# === Kubernetes ===
+**/kubeconfig*
+
+# === Logs & Temp ===
+*.log
+*.tmp
+*.temp
+*.cache
+*.bak
+
+# === Helm ===
+**/charts/*.tgz
+**/Chart.lock
+
+# === Node ===
 node_modules/
+**/node_modules/
 
-# Terraform (if any)
+# === Terraform ===
 .terraform/
 *.tfstate
 *.tfstate.backup
+
+# === Screenshots ===
+assets/screenshots/
+
+# === Test Reports ===
+**/test-output/
+**/surefire-reports/

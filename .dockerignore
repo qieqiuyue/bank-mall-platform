@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.gradle/
+
+# Build artifacts
+target/
+*.jar
+*.war
+build/
+dist/
+out/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+*.tar
+
+# Secrets (CRITICAL)
+**/secret.yaml
+**/secrets.yaml
+*.pem
+*.key
+*.crt
+!*.example
+!*.sample
+
+# Terraform
+.terraform/
+*.tfstate*
+
+# Temporary files
+*.log
+*.tmp
+/tmp/

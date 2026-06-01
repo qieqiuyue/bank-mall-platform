@@ -1,0 +1,34 @@
+# Maven
+target/
+*.jar
+*.war
+*.class
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# Docker
+*.tar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — NEVER commit
+k8s/base/secret.yaml
+*.pem
+*.key
+credentials.yml
+
+# Node (if any tooling)
+node_modules/
+
+# Terraform (if any)
+.terraform/
+*.tfstate
+*.tfstate.backup

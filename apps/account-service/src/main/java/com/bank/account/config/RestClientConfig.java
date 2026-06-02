@@ -11,8 +11,8 @@ import org.springframework.web.client.RestClient;
 public class RestClientConfig {
 
     @Bean
-    RestClient restClient(RestClient.Builder builder) {
-        return builder
+    RestClient restClient() {
+        return RestClient.builder()
                 .defaultHeader("X-Service-Name", "account-service")
                 .build();
     }

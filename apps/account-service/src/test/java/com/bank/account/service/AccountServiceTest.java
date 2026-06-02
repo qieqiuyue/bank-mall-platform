@@ -73,8 +73,6 @@ class AccountServiceTest {
 
     @Test
     void debit_invalidAmount() {
-        when(txnRepo.findByIdempotencyKey("KEY004")).thenReturn(Optional.empty());
-
         DebitRequest req = debitReq("-50.00", "KEY004");
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> accountService.debit("A1001", req));

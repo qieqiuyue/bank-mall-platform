@@ -77,14 +77,17 @@ public class AccountService {
                     "Cannot reverse a reversal transaction: " + req.getOriginalTransactionNo());
         }
 
-        // Reverse the original transaction: debit → credit, credit → debit
+        // Reverse the original transaction: debit→credit, credit→debit
+        // Uses REVERSAL type so the transaction is correctly marked
         BigDecimal reverseAmount = original.getAmount();
         if (original.getType() == TransactionType.DEBIT) {
             return withRetry(() ->
-                    doCredit(accountNo, toCreditForReverse(reverseAmount, original, req)));
+                    doCreditWithType(accountNo, toCreditForReverse(reverseAmount, original, req),
+                            TransactionType.REVERSAL));
         } else {
             return withRetry(() ->
-                    doDebit(accountNo, toDebitForReverse(reverseAmount, original, req)));
+                    doDebitWithType(accountNo, toDebitForReverse(reverseAmount, original, req),
+                            TransactionType.REVERSAL));
         }
     }
 
@@ -92,6 +95,15 @@ public class AccountService {
 
     @Transactional
     protected TransactionResponse doDebit(String accountNo, DebitRequest req) {
+        return doDebitWithType(accountNo, req, TransactionType.DEBIT);
+    }
+
+    @Transactional
+    protected TransactionResponse doCredit(String accountNo, CreditRequest req) {
+        return doCreditWithType(accountNo, req, TransactionType.CREDIT);
+    }
+
+    private TransactionResponse doDebitWithType(String accountNo, DebitRequest req, TransactionType type) {
         Account account = findAccount(accountNo);
         if (account.getBalance().compareTo(req.getAmount()) < 0) {
             throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE,
@@ -101,28 +113,27 @@ public class AccountService {
         account.setBalance(before.subtract(req.getAmount()));
         accountRepo.save(account);
 
-        Transaction txn = new Transaction(generateTxnNo(), accountNo, TransactionType.DEBIT,
+        Transaction txn = new Transaction(generateTxnNo(), accountNo, type,
                 req.getAmount(), before, account.getBalance(),
                 req.getReferenceType(), req.getReferenceId(), req.getIdempotencyKey());
         txnRepo.save(txn);
 
-        log.info("DEBIT {} amount={} balance {}→{}", accountNo, req.getAmount(), before, account.getBalance());
+        log.info("{} {} amount={} balance {}→{}", type, accountNo, req.getAmount(), before, account.getBalance());
         return TransactionResponse.from(txn);
     }
 
-    @Transactional
-    protected TransactionResponse doCredit(String accountNo, CreditRequest req) {
+    private TransactionResponse doCreditWithType(String accountNo, CreditRequest req, TransactionType type) {
         Account account = findAccount(accountNo);
         BigDecimal before = account.getBalance();
         account.setBalance(before.add(req.getAmount()));
         accountRepo.save(account);
 
-        Transaction txn = new Transaction(generateTxnNo(), accountNo, TransactionType.CREDIT,
+        Transaction txn = new Transaction(generateTxnNo(), accountNo, type,
                 req.getAmount(), before, account.getBalance(),
                 req.getReferenceType(), req.getReferenceId(), req.getIdempotencyKey());
         txnRepo.save(txn);
 
-        log.info("CREDIT {} amount={} balance {}→{}", accountNo, req.getAmount(), before, account.getBalance());
+        log.info("{} {} amount={} balance {}→{}", type, accountNo, req.getAmount(), before, account.getBalance());
         return TransactionResponse.from(txn);
     }
 

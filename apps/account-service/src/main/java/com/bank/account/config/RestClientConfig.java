@@ -1,0 +1,19 @@
+package com.bank.account.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
+
+/**
+ * RestClient 配置. Spring Boot 4.0 / Spring Framework 7.0 推荐 HTTP 客户端.
+ */
+@Configuration
+public class RestClientConfig {
+
+    @Bean
+    RestClient restClient(RestClient.Builder builder) {
+        return builder
+                .defaultHeader("X-Service-Name", "account-service")
+                .build();
+    }
+}

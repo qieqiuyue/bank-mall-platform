@@ -149,3 +149,99 @@
 - ✅ `java -jar --spring.profiles.active=h2`：两个服务本地启动正常，curl 验证通过
 
 ---
+
+## S1 CP2：payment-service 新写 + 跨服务调用 + 补偿兜底
+
+**日期**：2026-06-03 凌晨  
+**计划时间**：19h → **实际**：约 5h  
+**状态**：✅ 完成
+
+### 产出
+
+| 维度 | 数值 |
+|------|------|
+| 新建文件 | 22 |
+| 修改文件 | 1 (deployment.yaml) |
+| 测试 | 9 测试（6 service + 3 controller） |
+| 新增表 | payments + payment_transactions |
+| 新增 K8s 组件 | payment-service 2.0.0 |
+
+### 关键设计
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| HTTP 超时 | connect 2s, read 3s | 支付链路不阻塞过久，避免线程池耗尽 |
+| 结算账户 | `MALL-SETTLEMENT` 硬编码（默认值） | 平台工程演示，不走配置中心 |
+| reverse 重试 | 手动 3 次循环，1s 间隔 | 不用 spring-retry，最少依赖 |
+| db 幂等 | `payments.idempotency_key UNIQUE` | 与 account-service 的 DB UNIQUE 方案一致 |
+| 故障留痕 | `fail_reason` 记录 credit 原始错误 + reverse 3 次失败 | 对账溯源完整信息 |
+
+### 踩坑
+
+#### 坑 1：PaymentTransactionRepository 漏文件
+- **现象**：`mvn compile` 报 `cannot find symbol: class PaymentTransactionRepository`
+- **根因**：写入文件时被权限系统拦截，创建了其他文件但漏了该 Repository
+- **解决**：补写 + 提交推送。**教训**：写完文件后 `find src -name "*.java" | wc -l` 确认数量
+
+#### 坑 2：NetworkPolicy Egress 拦截跨服务 HTTP
+- **现象**：payment-service 日志 `Connect timed out` 调用 account-service:8082
+- **根因**：`deny-all` 策略默认拒绝所有出站流量。`allow-services-egress` 只放了 `app: mysql` 的 3306 端口，没有放行服务间 HTTP（8081-8084）
+- **解决**：新增 `allow-services-ingress` + 修改 `allow-services-egress` 增加 4 个服务端口
+- **教训**：每当有新服务加入跨服务调用链时，NetworkPolicy 的 ingress/egress 双向都要更新
+
+#### 坑 3：liveness probe 30s 不够
+- **现象**：Pod 启动 ~68s（JPA + Flyway），30s 探活开始杀 Pod
+- **解决**：`kubectl patch` 改到 120s + `kubectl apply deployment.yaml`
+- **复用 CP1 经验**：直接设置 initialDelaySeconds=120
+
+#### 坑 4：MALL-SETTLEMENT 账户不存在
+- **现象**：ERROR_MANUAL_REVIEW，`Account not found: MALL-SETTLEMENT`
+- **根因**：account-service DataInitializer 只 seed 了 A1001 + A1002，没有结算账户
+- **解决**：`INSERT INTO bank_account.accounts` 手动插入，同时修改 DataInitializer 增加第三条 seed
+
+#### 坑 5：deployment.yaml 的 image tag 生效需要 rollout restart
+- **现象**：`kubectl apply -f` 更新了 yaml，但 Pod 仍是 1.0.0 镜像
+- **根因**：Deployment 只追踪 `.spec.template` 的变化触发滚动更新。`kubectl apply` 更新后需手动 `kubectl set image` 或 `kubectl rollout restart`
+- **解决**：组合 `kubectl set image` + `kubectl rollout restart`
+
+### 验证结果
+
+```bash
+# 全链路成功
+curl -X POST .../payment/api/payments -d '{"amount":50,..."idempotencyKey":"CP2-SUCCESS-001"}'
+→ status: COMPLETED, paymentNo: ce5bfd62-...
+
+# 余额正确
+A1001: 8888.88 → 8389.88 (-100, CP2-SETTLE-001)
+MALL-SETTLEMENT: 0 → 150 (+100 + +50)
+
+# 补偿验证
+无 MALL-SETTLEMENT 时 → status: ERROR_MANUAL_REVIEW
+fail_reason: "Debit succeeded but credit+reverse both failed..."
+```
+
+### 面试素材
+
+**"你怎么测试补偿逻辑？"**
+> 我故意不创建结算账户 MALL-SETTLEMENT，发了一笔支付。扣款成功了但入账失败，reverse 被自动触发并执行了 3 次重试。最终 payment 状态变成 ERROR_MANUAL_REVIEW，fail_reason 里记录了 credit 的错误信息和 reverse 的 3 次重试结果。然后我手动插入结算账户，再发一笔，支付链路完全正常——扣款→入账→流水全部一致。
+
+**"跨服务调用怎么处理超时和失败？"**
+> RestClient 设了连接 2 秒、读取 3 秒的超时。如果 account-service 不可达，AccountClient 会抛 BusinessException(ACCOUNT_SERVICE_UNAVAILABLE)，PaymentService 捕获后走补偿分支——已扣款则冲正，未扣款则直接标记 FAILED。这比用 WebClient.block() 更干净——同步调用不需要引入 Reactor 栈。
+
+---
+
+## 分支策略（2026-06-03 切换）
+
+S0-S1 期间使用 `feat/s0-cluster-verification` 承载所有前期工作。
+
+自 S1 CP2 完成后切换为新命名规则：
+- **已完成分支**：`feat/s0-cluster-verification` → PR 合并 → main → **删除**
+- **未来分支**：从 main 拉 `feat/<feature-name>`、`fix/<description>`
+- **当前 S1 CP3 下一步**：`git checkout -b feat/notification-service`（从 main）
+- VM 上：`git checkout main && git pull` 永远用最新
+
+**实际操作**：
+1. GitHub 上把 `feat/s0-cluster-verification` 通过 PR 合并到 main
+2. WSL2：`git checkout main && git pull && git branch -d feat/s0-cluster-verification`
+3. WSL2：`git checkout -b feat/notification-service`（CP3 开发）
+4. VM：`git checkout main && git pull origin main`（永远拉 main 部署）

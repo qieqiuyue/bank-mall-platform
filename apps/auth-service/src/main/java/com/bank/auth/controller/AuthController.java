@@ -3,6 +3,12 @@ package com.bank.auth.controller;
 import com.bank.auth.api.ApiResponse;
 import com.bank.auth.entity.User;
 import com.bank.auth.repository.UserRepository;
+import com.bank.auth.util.JwtUtil;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -11,12 +17,18 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final UserRepository userRepository;
-    private final Map<String, User> tokenStore = new java.util.concurrent.ConcurrentHashMap<>();
+    private final BCryptPasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
-    public AuthController(UserRepository userRepository) {
+    public AuthController(UserRepository userRepository,
+                          BCryptPasswordEncoder passwordEncoder,
+                          JwtUtil jwtUtil) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/login")
@@ -33,10 +45,9 @@ public class AuthController {
 
         Optional<User> userOpt = userRepository.findByUsername(username);
 
-        if (userOpt.isPresent() && password.equals(userOpt.get().getPassword())) {
+        if (userOpt.isPresent() && passwordEncoder.matches(password, userOpt.get().getPassword())) {
             User user = userOpt.get();
-            String token = "token-" + UUID.randomUUID();
-            tokenStore.put(token, user);
+            String token = jwtUtil.generateToken(user);
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("token", token);
@@ -52,19 +63,23 @@ public class AuthController {
     }
 
     @PostMapping("/validate")
-    public ApiResponse<Map<String, Object>> validate(@RequestHeader(value = "Authorization", required = false) String authorization) {
-        if (authorization != null && authorization.startsWith("Bearer ")) {
-            String token = authorization.substring(7);
-            User user = tokenStore.get(token);
-            if (user != null) {
-                return ApiResponse.success("Token is valid", Map.of(
-                    "valid", true,
-                    "principal", user.getUserId() != null ? user.getUserId() : "unknown",
-                    "checkedAt", Instant.now().toString()
-                ));
-            }
+    public ApiResponse<Map<String, Object>> validate(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
+            return ApiResponse.error("AUTH_FAILED", "Invalid or missing bearer token");
         }
-        return ApiResponse.error("AUTH_FAILED", "Invalid or missing bearer token");
+        String token = authorization.substring(7);
+        try {
+            Claims claims = jwtUtil.validateToken(token);
+            return ApiResponse.success("Token is valid", Map.of(
+                    "valid", true,
+                    "principal", claims.getSubject(),
+                    "checkedAt", Instant.now().toString()
+            ));
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Token validation failed: {}", e.getMessage());
+            return ApiResponse.error("AUTH_FAILED", "Invalid or expired token");
+        }
     }
 
     @GetMapping("/users/{userId}")

@@ -19,7 +19,9 @@ public class DataInitializer {
                         new BigDecimal("8888.88")));
                 repo.save(new Account("A1002", "U1002", "SAVING", "ACTIVE",
                         new BigDecimal("50000.00")));
-                System.out.println("[account-service] Seeded 2 demo accounts.");
+                repo.save(new Account("MALL-SETTLEMENT", "SYSTEM", "SETTLEMENT", "ACTIVE",
+                        BigDecimal.ZERO));
+                System.out.println("[account-service] Seeded 3 demo accounts (incl. settlement).");
             }
         };
     }

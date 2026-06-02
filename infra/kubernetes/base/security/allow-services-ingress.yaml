@@ -1,25 +1,16 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-services-egress
+  name: allow-http-to-services
   namespace: bank-mall
 spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/part-of: bank-mall
   policyTypes:
-  - Egress
-  egress:
-  # Allow access to MySQL
-  - to:
-    - podSelector:
-        matchLabels:
-          app: mysql
-    ports:
-    - protocol: TCP
-      port: 3306
-  # Allow service-to-service HTTP (payment→account→notification)
-  - to:
+  - Ingress
+  ingress:
+  - from:
     - podSelector:
         matchLabels:
           app.kubernetes.io/part-of: bank-mall

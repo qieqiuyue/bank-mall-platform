@@ -98,10 +98,54 @@
 **“auth-service 明文密码 → BCrypt + JWT”**
 > 原来的 auth-service 用明文存密码、用 ConcurrentHashMap 在内存里管 token。我做了两个改造：密码用 BCrypt 编码——只引入了 spring-security-crypto 这一个模块，不引入整个 Spring Security 框架。token 从 `"token-" + UUID` 改为 JJWT 签发的无状态 JWT，包含 userId/username/roles/expiration。这样 auth-service 变成无状态服务，多副本天然负载均衡，不需要 Redis 做 session 共享。
 
-### 待完成
-- [ ] H2 启动 + curl 全端点验证
-- [ ] Docker 构建 + 推 Harbor
-- [ ] K8s 更新 JWT Secret + 滚动部署 auth/account 两个服务
-- [ ] Ingress 全链路验证
+### 部署验证
+
+**日期**：2026-06-02 深夜~2026-06-03 凌晨  
+**结果**：✅ 两个服务成功部署，全链路验证通过
+
+| 步骤 | 操作 | 结果 |
+|------|------|:---:|
+| Docker 构建 | harbor01 上 `docker build` + `docker push` 两个 2.0.0 镜像 | ✅ |
+| Worker 预拉 | worker01/02 上 `ctr images pull --plain-http` | ✅ |
+| JWT Secret | master01 上 `kubectl patch secret` 只更新 JWT_KEY 字段 | ✅ |
+| NetworkPolicy | `allow-mysql.yaml` 新增 account/payment/notification 白名单 | ✅ |
+| 滚动部署 | `kubectl set image` + `rollout restart` | ✅ |
+| 数据修复 | `DELETE FROM bank_auth.users` 清旧明文密码，DataInitializer 重 seed | ✅ |
+| 接口验证 | curl account balance + debit + auth login + validate + health | ✅ 6/6 |
+
+### 部署踩坑
+
+#### 坑 4：RestClient.Builder 自动注入失败
+- **现象**：auth-service 启动报 `No qualifying bean of type 'org.springframework.web.client.RestClient$Builder'`
+- **根因**：S0 写 RestClientConfig 时用了 `RestClient restClient(RestClient.Builder builder)` 依赖注入，在 SB 4.0 中 `RestClient.Builder` 不会自动注册为 Bean（与 SB 3.x 行为不同）
+- **解决**：改为 `RestClient.builder()` 手动创建，不依赖注入。两个服务都修了。
+- **教训**：SB 4.0 模块化后，很多自动配置的 Bean 消失了。带 `@Bean` 方法的参数注入不一定可靠。
+
+#### 坑 5：NetworkPolicy 白名单遗漏
+- **现象**：account-service Pod 不断重启，日志 `SocketTimeoutException: Connect timed out` 连 MySQL
+- **根因**：`allow-mysql.yaml` 只放行了 `app: auth-service` 访问 MySQL 3306 端口，其他 3 个服务被 deny-all 策略拦截。旧集群只有 auth-service 真用了 MySQL，其他都是 mock。
+- **解决**：修改 NetworkPolicy，增加 `app: account-service`、`app: payment-service`、`app: notification-service` 三条 podSelector。
+- **面试话术**："之前只有 auth-service 用了 MySQL，其他服务是 mock。S1 把 account-service 重写后它需要自己的数据库，但 NetworkPolicy 忘了加白名单。这种问题在生产环境很常见——加一个新服务或者给旧服务新开一个数据库依赖，防火墙规则要同步更新。我用 `kubectl describe netpol` 定位到 deny-all 拦截了 3306 端口的出站流量，三分钟就修好了。"
+
+#### 坑 6：Flyway 不执行 + Hibernate validate 阻塞
+- **现象**：Pod `CrashLoopBackOff`，日志 `Schema validation: missing table [accounts]`
+- **根因**：`ddl-auto: validate` 在 Flyway 之前校验表结构，而 bank_account 库是空的（表还没建）。Flyway 本应在 Hibernate 之前运行，但在本次部署中未触发（日志中无 Flyway 输出，待深入排查）。
+- **解决**：先 `kubectl set env SPRING_JPA_HIBERNATE_DDL_AUTO=update` 让 Hibernate 直接建表，后续再切回 validate。不是最优方案，但保证了进度。
+- **TODO**：排查 Flyway 为何在 K8s prod 环境下不触发（本地 H2 测试正常），可能和 `baseline-on-migrate` 或 MySQL 用户权限有关。
+
+#### 坑 7：liveness probe 过短
+- **现象**：Pod `Running` 但 `RESTARTS` 不断增加。新 account-service 启动需 ~60s（JPA 初始化），探活 30s 就杀 Pod。
+- **解决**：`kubectl patch deployment account-service -- livenessProbe.initialDelaySeconds=120`
+- **教训**：带 Flyway/JPA 的服务首次启动时间远超静态服务。探活配置应按最慢启动路径算，不能沿用 mock 服务的参数。
+
+#### 坑 8：auth-service 旧数据不兼容 BCrypt
+- **现象**：JWT 登录返回 `null`，验证 `AUTH_FAILED`
+- **根因**：S0 时数据库里有 3 个用户的明文密码（`123456`），新代码用 `BCryptPasswordEncoder.matches()` 去匹配明文 → 永远失败。JWT 签发路径依赖 BCrypt 验证通过。
+- **解决**：`DELETE FROM bank_auth.users` 清空，重启后 DataInitializer 用 BCrypt 重新 seed。
+- **面试话术**："密码哈希算法升级是典型的破坏性变更。旧数据不兼容新算法，必须迁移。生产环境通常用两阶段迁移：先双写（同时支持旧哈希和新哈希验证），再批量重哈希，最后下线旧验证逻辑。我这里因为是实验环境直接清数据重建了——但如果面试官问，我会说清楚生产方案。"
+
+### H2 本地验证（补充）
+- ✅ `mvn test`：account-service 15 测试 + auth-service 11 测试，全部通过
+- ✅ `java -jar --spring.profiles.active=h2`：两个服务本地启动正常，curl 验证通过
 
 ---

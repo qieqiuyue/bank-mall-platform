@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: bank-mall
+    app.kubernetes.io/component: ingress
+data:
+  allow-snippet-annotations: "false"
+  proxy-body-size: "10m"
+  proxy-connect-timeout: "10"
+  proxy-read-timeout: "60"
+  proxy-send-timeout: "60"

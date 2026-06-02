@@ -1,0 +1,12 @@
+# H2 内存库配置 —— 仅用于快速验证启动，不依赖 MySQL
+spring:
+  datasource:
+    url: jdbc:h2:mem:bank_auth;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true

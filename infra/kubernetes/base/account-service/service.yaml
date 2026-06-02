@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: account-service
+  namespace: bank-mall
+  labels:
+    app: account-service
+    app.kubernetes.io/part-of: bank-mall
+    app.kubernetes.io/component: account
+spec:
+  type: ClusterIP
+  selector:
+    app: account-service
+  ports:
+  - port: 8082
+    targetPort: 8082
+    protocol: TCP

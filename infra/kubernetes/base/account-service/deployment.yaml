@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account-service
+  namespace: bank-mall
+  labels:
+    app: account-service
+    app.kubernetes.io/part-of: bank-mall
+    app.kubernetes.io/component: account
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: account-service
+  template:
+    metadata:
+      labels:
+        app: account-service
+        app.kubernetes.io/part-of: bank-mall
+        app.kubernetes.io/component: account
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8082"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: account-service
+        image: 10.0.0.61/bank-mall/account-service:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8082
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: bank-mall-config
+        - secretRef:
+            name: bank-mall-secret
+        env:
+        - name: SERVER_PORT
+          value: "8082"
+        - name: SPRING_APPLICATION_NAME
+          value: "account-service"
+        livenessProbe:
+          httpGet:
+            path: /api/accounts/health
+            port: 8082
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/accounts/health
+            port: 8082
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL

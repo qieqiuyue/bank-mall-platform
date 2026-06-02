@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: bank-mall
+  labels:
+    app: notification-service
+    app.kubernetes.io/part-of: bank-mall
+    app.kubernetes.io/component: notification
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+        app.kubernetes.io/part-of: bank-mall
+        app.kubernetes.io/component: notification
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8084"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: notification-service
+        image: 10.0.0.61/bank-mall/notification-service:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8084
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: bank-mall-config
+        - secretRef:
+            name: bank-mall-secret
+        env:
+        - name: SERVER_PORT
+          value: "8084"
+        - name: SPRING_APPLICATION_NAME
+          value: "notification-service"
+        livenessProbe:
+          httpGet:
+            path: /api/notifications/health
+            port: 8084
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/notifications/health
+            port: 8084
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL

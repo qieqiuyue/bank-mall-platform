@@ -1,0 +1,272 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: monitoring
+  labels:
+    app: grafana
+    app.kubernetes.io/part-of: bank-mall
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      uid: prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus:9090
+      isDefault: true
+      editable: true
+    - name: Loki
+      uid: loki
+      type: loki
+      access: proxy
+      url: http://loki:3100
+      editable: true
+  dashboard-provider.yaml: |
+    apiVersion: 1
+    providers:
+    - name: default
+      folder: Bank-Mall
+      type: file
+      options:
+        path: /etc/grafana/dashboards
+  contact-points.yaml: |
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: bank-mall-alerts
+        receivers:
+          - uid: webhook-1
+            type: webhook
+            settings:
+              url: http://localhost:9999/alerts
+              httpMethod: POST
+            disableResolveMessage: false
+  notification-policies.yaml: |
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: bank-mall-alerts
+        group_by:
+          - grafana_folder
+          - alertname
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+  alert-rules.yaml: |
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: bank-mall-service-health
+        folder: Bank-Mall
+        interval: 1m
+        rules:
+          - uid: alert-service-down
+            title: Service Down
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: prometheus
+                model:
+                  expr: up{job=~"bank-mall/.*"} == 0
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 0
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 0
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0
+                  refId: C
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "{{ $labels.job }} is down"
+              description: "Service {{ $labels.job }} has been down for more than 1 minute."
+          - uid: alert-high-cpu
+            title: High CPU Usage
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: prometheus
+                model:
+                  expr: rate(process_cpu_seconds_total{job=~"bank-mall/.*"}[5m]) > 0.8
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 0
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 0
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0
+                  refId: C
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.job }} high CPU usage"
+              description: "Service {{ $labels.job }} CPU usage has exceeded 80% for 5 minutes."
+          - uid: alert-high-memory
+            title: High Memory Usage
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: prometheus
+                model:
+                  expr: jvm_memory_used_bytes{job=~"bank-mall/.*", area="heap"} / jvm_memory_max_bytes{job=~"bank-mall/.*", area="heap"} > 0.85
+                  instant: true
+                  refId: A
+              - refId: B
+                relativeTimeRange:
+                  from: 0
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange:
+                  from: 0
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0
+                  refId: C
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.job }} high JVM heap usage"
+              description: "Service {{ $labels.job }} JVM heap usage has exceeded 85% for 5 minutes."
+  bank-mall-overview.json: |
+    {
+      "title": "Bank Mall - Service Overview",
+      "uid": "bank-mall-overview",
+      "panels": [
+        {
+          "title": "Pod CPU Usage",
+          "type": "timeseries",
+          "gridPos": {"x":0,"y":0,"w":12,"h":8},
+          "targets": [{
+            "expr": "process_cpu_usage{job=~\"bank-mall/.*\"}",
+            "legendFormat": "{{pod}}"
+          }]
+        },
+        {
+          "title": "Pod Memory Usage",
+          "type": "timeseries",
+          "gridPos": {"x":12,"y":0,"w":12,"h":8},
+          "targets": [{
+            "expr": "jvm_memory_used_bytes{job=~\"bank-mall/.*\"}",
+            "legendFormat": "{{pod}} - {{area}}"
+          }]
+        },
+        {
+          "title": "JVM GC Pause Time",
+          "type": "timeseries",
+          "gridPos": {"x":0,"y":8,"w":8,"h":7},
+          "targets": [{
+            "expr": "rate(jvm_gc_pause_seconds_sum{job=~\"bank-mall/.*\"}[1m])",
+            "legendFormat": "{{pod}} - {{action}}"
+          }]
+        },
+        {
+          "title": "HTTP Request Rate",
+          "type": "timeseries",
+          "gridPos": {"x":8,"y":8,"w":8,"h":7},
+          "targets": [{
+            "expr": "rate(http_server_requests_seconds_count{job=~\"bank-mall/.*\"}[1m])",
+            "legendFormat": "{{pod}} - {{method}} {{uri}}"
+          }]
+        },
+        {
+          "title": "Service Up/Down",
+          "type": "stat",
+          "gridPos": {"x":16,"y":8,"w":8,"h":7},
+          "targets": [{
+            "expr": "up{job=~\"bank-mall/.*\"}",
+            "legendFormat": "{{job}}"
+          }]
+        },
+        {
+          "title": "JVM Thread Count",
+          "type": "timeseries",
+          "gridPos": {"x":0,"y":15,"w":8,"h":7},
+          "targets": [{
+            "expr": "jvm_threads_live_threads{job=~\"bank-mall/.*\"}",
+            "legendFormat": "{{pod}}"
+          }]
+        },
+        {
+          "title": "HTTP Response Time (p99)",
+          "type": "timeseries",
+          "gridPos": {"x":8,"y":15,"w":8,"h":7},
+          "targets": [{
+            "expr": "http_server_requests_seconds_sum{job=~\"bank-mall/.*\"} / http_server_requests_seconds_count{job=~\"bank-mall/.*\"}",
+            "legendFormat": "{{pod}} - {{uri}}"
+          }]
+        },
+        {
+          "title": "Pod Count",
+          "type": "stat",
+          "gridPos": {"x":16,"y":15,"w":8,"h":7},
+          "targets": [{
+            "expr": "count(up{job=~\"bank-mall/.*\"})",
+            "legendFormat": "Running Services"
+          }]
+        }
+      ]
+    }

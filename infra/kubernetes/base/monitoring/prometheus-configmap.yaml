@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+  labels:
+    app: prometheus
+    app.kubernetes.io/part-of: bank-mall
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: bank-mall
+        env: lab
+
+    scrape_configs:
+
+    - job_name: prometheus
+      static_configs:
+      - targets: ['localhost:9090']
+
+    - job_name: spring-boot
+      metrics_path: /actuator/prometheus
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+          - bank-mall
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: 'true'
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_pod_label_app]
+        action: replace
+        separator: /
+        target_label: job
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        target_label: node
+
+    - job_name: spring-boot-static
+      metrics_path: /actuator/prometheus
+      static_configs:
+      - targets:
+        - auth-service.bank-mall.svc.cluster.local:8081
+        - account-service.bank-mall.svc.cluster.local:8082
+        - payment-service.bank-mall.svc.cluster.local:8083
+        - notification-service.bank-mall.svc.cluster.local:8084
+        labels:
+          namespace: bank-mall

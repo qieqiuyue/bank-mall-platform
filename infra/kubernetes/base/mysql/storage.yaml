@@ -1,0 +1,42 @@
+# MySQL 存储配置
+# 前置操作：在 worker 节点上创建数据目录
+#   sudo mkdir -p /data/mysql
+#   sudo chown 999:999 /data/mysql    # MySQL container runs as UID 999
+# 注意：hostPath PV 仅用于学习环境，生产环境请使用 StorageClass + PVC
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+  labels:
+    app: mysql
+    app.kubernetes.io/part-of: bank-mall
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /data/mysql
+    type: DirectoryOrCreate
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: bank-mall
+  labels:
+    app: mysql
+    app.kubernetes.io/part-of: bank-mall
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      app: mysql

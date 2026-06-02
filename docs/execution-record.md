@@ -54,10 +54,54 @@
 
 ---
 
-## S1：业务最小闭环
+## S1 CP1：account-service 新写 + auth-service JWT 改造
 
-**日期**：待执行  
-**计划时间**：47h  
-**状态**：🔵 未开始
+**日期**：2026-06-02  
+**计划时间**：18h → **实际**：约 6h  
+**状态**：✅ 代码完成，测试通过，待 K8s 部署验证
+
+### 产出
+
+| 服务 | 新建 | 修改 | 测试 | 结果 |
+|------|:---:|:---:|:---:|:---:|
+| account-service | 23 文件 | 0 | 15 测试 | ✅ BUILD SUCCESS, 0 failures |
+| auth-service | 2 文件 | 4 文件 | 11 测试 | ✅ BUILD SUCCESS, 0 failures |
+
+### 踩坑
+
+#### 坑 1：SB 4.0 测试注解变更
+- **现象**：`@MockBean` 和 `@WebMvcTest` 编译失败，`package org.springframework.boot.test.mock.bean does not exist`
+- **根因**：`@MockBean` 在 SB 3.4+ 重命名为 `@MockitoBean`，但 SB 4.0 将其移除得更彻底；`spring-boot-starter-test` 不再自动引入 `spring-boot-test-autoconfigure`
+- **解决**：改用 standalone `MockMvcBuilders.standaloneSetup()` + 普通 `Mockito.mock()`，零 SB 注解依赖，只依赖 `spring-boot-starter-test`
+
+#### 坑 2：reverse 事务类型错误
+- **现象**：`reverse_success` 测试失败，期望 `REVERSAL` 实际返回 `CREDIT`
+- **根因**：`reverse()` 方法直接复用 `doCredit()`/`doDebit()`，创建的事务类型是 CREDIT/DEBIT
+- **解决**：新增 `doCreditWithType()`/`doDebitWithType()` 方法，reverse 调用时传入 `TransactionType.REVERSAL`
+
+#### 坑 3：XML 标签重复
+- `</dependency>` 编辑时意外重复，导致 POM 不可解析。手动删除修复。
+
+### 关键决策
+
+- **ApiResponse 独立复制**：两个服务各持一份 ApiResponse.java，加 `// NOTE: Duplicated. Keep in sync.` 注释。避免 Maven 多模块重构。
+- **Account 主键用 String accountNo**：来自核心银行系统的自然键，不用自增 ID。
+- **乐观锁手动 3 次重试**：不引入 spring-retry，减少 Java 依赖。
+- **Flyway 管理 schema**：`ddl-auto: validate`，JPA 不自动建表。
+- **BCrypt 独立使用**：`spring-security-crypto` 只引入 BCryptPasswordEncoder，不引入全部 Spring Security。
+
+### 面试故事素材
+
+**“account-service 从 mock 重写为真实 JPA 服务”**
+> 原来的 account-service 是完全 mock 的——所有数据硬编码，没有数据库，没有 JPA。我在 S1 把它重写了：Account + Transaction 两个 JPA 实体，Flyway 管理建表迁移，@Version 乐观锁防止并发扣款超扣，idempotency_key UNIQUE 约束防止重复处理。幂等检查和乐观锁重试都是手工实现的，没有引入 spring-retry——因为就 3 次重试，手工写比引入一个依赖更简单。
+
+**“auth-service 明文密码 → BCrypt + JWT”**
+> 原来的 auth-service 用明文存密码、用 ConcurrentHashMap 在内存里管 token。我做了两个改造：密码用 BCrypt 编码——只引入了 spring-security-crypto 这一个模块，不引入整个 Spring Security 框架。token 从 `"token-" + UUID` 改为 JJWT 签发的无状态 JWT，包含 userId/username/roles/expiration。这样 auth-service 变成无状态服务，多副本天然负载均衡，不需要 Redis 做 session 共享。
+
+### 待完成
+- [ ] H2 启动 + curl 全端点验证
+- [ ] Docker 构建 + 推 Harbor
+- [ ] K8s 更新 JWT Secret + 滚动部署 auth/account 两个服务
+- [ ] Ingress 全链路验证
 
 ---

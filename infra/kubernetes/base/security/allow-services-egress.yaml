@@ -10,6 +10,7 @@ spec:
   policyTypes:
   - Egress
   egress:
+  # Allow access to MySQL
   - to:
     - podSelector:
         matchLabels:
@@ -17,3 +18,17 @@ spec:
     ports:
     - protocol: TCP
       port: 3306
+  # Allow service-to-service HTTP on all app ports (8081-8084)
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: bank-mall
+    ports:
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8082
+    - protocol: TCP
+      port: 8083
+    - protocol: TCP
+      port: 8084

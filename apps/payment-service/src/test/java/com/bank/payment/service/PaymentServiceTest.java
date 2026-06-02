@@ -29,6 +29,7 @@ class PaymentServiceTest {
     @Mock PaymentRepository paymentRepo;
     @Mock PaymentTransactionRepository txnRepo;
     @Mock AccountClient accountClient;
+    @Mock com.bank.payment.client.NotificationClient notificationClient;
     @InjectMocks PaymentService paymentService;
 
     private PaymentRequest req;

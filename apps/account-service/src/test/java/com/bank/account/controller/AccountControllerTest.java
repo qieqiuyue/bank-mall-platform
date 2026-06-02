@@ -1,32 +1,33 @@
 package com.bank.account.controller;
 
-import com.bank.account.dto.AccountResponse;
 import com.bank.account.dto.TransactionResponse;
 import com.bank.account.service.AccountService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.bean.MockitoBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(AccountController.class)
-@ActiveProfiles("test")
 class AccountControllerTest {
 
-    @Autowired MockMvc mvc;
-    @MockitoBean AccountService accountService;
+    private MockMvc mvc;
+    private AccountService accountService;
+
+    @BeforeEach
+    void setUp() {
+        accountService = mock(AccountService.class);
+        mvc = MockMvcBuilders.standaloneSetup(new AccountController(accountService)).build();
+    }
 
     @Test
     void getBalance_success() throws Exception {

@@ -245,3 +245,77 @@ S0-S1 期间使用 `feat/s0-cluster-verification` 承载所有前期工作。
 2. WSL2：`git checkout main && git pull && git branch -d feat/s0-cluster-verification`
 3. WSL2：`git checkout -b feat/notification-service`（CP3 开发）
 4. VM：`git checkout main && git pull origin main`（永远拉 main 部署）
+
+---
+
+## S1 CP3：notification-service 新写 + 全链路验证 + S1 完结
+
+**日期**：2026-06-03 凌晨  
+**计划时间**：10h → **实际**：约 3h  
+**状态**：✅ 完成 — S1 业务最小闭环全部交付
+
+### 产出
+
+| 维度 | 数值 |
+|------|------|
+| 新建文件 | 14（notification-service）+ 1（NotificationClient） |
+| 修改文件 | 1（deployment.yaml） |
+| 测试 | 6 新增 + 9 payment 无回归 = 15 tests |
+| 新增表 | notifications |
+| 全链路 | payment → account(debit+credit) → notification 落库 |
+
+### 踩坑
+
+#### 坑 1：NotifyApplication.java 漏写
+- **现象**：`ClassNotFoundException: com.bank.notification.NotifyApplication`，JAR 打包无主类
+- **根因**：写入时被权限系统拦截，13 个 Java 文件中漏了主类
+- **教训**：写完文件后 `find src -name "*.java" | wc -l` + 检查关键文件名
+
+#### 坑 2：Docker 缓存未清
+- **现象**：加了 NotifyApplication 重新推送后，Harbor 上的镜像 digest 不变
+- **根因**：Docker 多层缓存，`mvn clean package -DskipTests` 之后 `docker build` 仍用缓存
+- **解决**：`docker build --no-cache` 强制重打
+
+#### 坑 3：Git 分支混乱
+- **现象**：feat/notification-service 从 main 建，但 main 上无 notification-service 目录
+- **根因**：WSL2 本地 main 与 GitHub main 不同步（main 保护分支）
+- **解决**：手动 force push rebase 到正确基线
+
+### 验证结果
+
+```bash
+# 全链路成功
+POST /payment/api/payments → COMPLETED, paymentNo: a56c82b5-...
+GET /notification/api/notifications?accountNo=A1001 → 1 record, status: SENT
+A1001 balance: 8888.88 → 8289.88 (累计 -599)
+
+# S1 全部服务
+auth:       JWT login ✅  BCrypt ✅
+account:    debit/credit/reverse ✅  乐观锁 ✅  幂等 ✅
+payment:    RestClient 跨服务 ✅  补偿 ✅  ERROR_MANUAL_REVIEW ✅
+notification: 支付通知落库 ✅  写入即完成 ✅
+```
+
+### 面试素材
+
+**"为什么 notification-service 只写不发送？"**
+> notification-service 收到请求后落库标记 SENT，不实际调用短信/邮件网关。这是有意为之——支付服务不关心通知怎么送达，只关心记录是否落库。生产环境接入短信通道是配置级变更：换一个 NotificationService 实现即可，支付链路零改动。这体现了服务间的最小知识原则。
+
+### S1 总计
+
+| 指标 | 数值 |
+|------|------|
+| 重写服务 | 3（account + payment + notification） |
+| 改造服务 | 1（auth JWT + BCrypt） |
+| 新增测试 | 41 tests（26+9+6） |
+| 计划时间 | 47h |
+| 实际时间 | ~15h |
+| 踩坑文档化 | 20 个（3 S0 + 8 CP1 + 5 CP2 + 3 CP3 + 1 分支） |
+| K8s 镜像 | 4 × 2.0.0 |
+
+### 分支策略（实际情况）
+
+最终使用 `feat/notification-service` 分支开发 CP3。因 main 分支受 GitHub 保护，通过 PR 合并：
+1. `feat/s0-cluster-verification`（S0+CP1+CP2）→ PR → main（已合并）
+2. `feat/notification-service`（CP3）→ PR → main（待合并）
+3. VM harbor01/master01 使用 `feat/notification-service`，后续统一切 main

@@ -1,6 +1,7 @@
 package com.bank.payment.service;
 
 import com.bank.payment.client.AccountClient;
+import com.bank.payment.client.NotificationClient;
 import com.bank.payment.dto.AccountServiceResponse;
 import com.bank.payment.dto.PaymentRequest;
 import com.bank.payment.dto.PaymentResponse;
@@ -27,13 +28,16 @@ public class PaymentService {
     private final PaymentRepository paymentRepo;
     private final PaymentTransactionRepository txnRepo;
     private final AccountClient accountClient;
+    private final NotificationClient notificationClient;
 
     public PaymentService(PaymentRepository paymentRepo,
                           PaymentTransactionRepository txnRepo,
-                          AccountClient accountClient) {
+                          AccountClient accountClient,
+                          NotificationClient notificationClient) {
         this.paymentRepo = paymentRepo;
         this.txnRepo = txnRepo;
         this.accountClient = accountClient;
+        this.notificationClient = notificationClient;
     }
 
     public PaymentResponse getPayment(String paymentNo) {
@@ -90,6 +94,10 @@ public class PaymentService {
             payment.setStatus("COMPLETED");
             log.info("Payment {} completed: {} debit, {} credit, amount={}",
                     payment.getPaymentNo(), req.getPayerAccount(), payeeAccount, req.getAmount());
+
+            // Step 3: Notify — non-blocking, failure does not roll back payment
+            notificationClient.send(req.getPayerAccount(), "PAYMENT_SUCCESS",
+                    "Payment of " + req.getAmount() + " " + payment.getCurrency() + " processed.");
         } catch (Exception e) {
             if (hasDebit) {
                 // Compensation: debit succeeded but credit failed → reverse the debit

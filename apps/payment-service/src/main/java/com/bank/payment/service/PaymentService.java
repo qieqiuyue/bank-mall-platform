@@ -1,0 +1,145 @@
+package com.bank.payment.service;
+
+import com.bank.payment.client.AccountClient;
+import com.bank.payment.dto.AccountServiceResponse;
+import com.bank.payment.dto.PaymentRequest;
+import com.bank.payment.dto.PaymentResponse;
+import com.bank.payment.entity.Payment;
+import com.bank.payment.entity.PaymentTransaction;
+import com.bank.payment.exception.BusinessException;
+import com.bank.payment.exception.ErrorCode;
+import com.bank.payment.repository.PaymentRepository;
+import com.bank.payment.repository.PaymentTransactionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.Optional;
+
+@Service
+public class PaymentService {
+    private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
+    private static final String MALL_SETTLEMENT = "MALL-SETTLEMENT";
+    private static final int MAX_REVERSE_RETRY = 3;
+
+    private final PaymentRepository paymentRepo;
+    private final PaymentTransactionRepository txnRepo;
+    private final AccountClient accountClient;
+
+    public PaymentService(PaymentRepository paymentRepo,
+                          PaymentTransactionRepository txnRepo,
+                          AccountClient accountClient) {
+        this.paymentRepo = paymentRepo;
+        this.txnRepo = txnRepo;
+        this.accountClient = accountClient;
+    }
+
+    public PaymentResponse getPayment(String paymentNo) {
+        Payment p = paymentRepo.findByPaymentNo(paymentNo)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND,
+                        "Payment not found: " + paymentNo));
+        return PaymentResponse.from(p);
+    }
+
+    @Transactional
+    public PaymentResponse processPayment(PaymentRequest req) {
+        // Idempotency check
+        if (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank()) {
+            Optional<Payment> existing = paymentRepo.findByIdempotencyKey(req.getIdempotencyKey());
+            if (existing.isPresent()) {
+                Payment p = existing.get();
+                String status = p.getStatus();
+                if ("COMPLETED".equals(status) || "FAILED".equals(status)
+                        || "ERROR_MANUAL_REVIEW".equals(status)) {
+                    log.info("Idempotent request: returning existing payment {}", p.getPaymentNo());
+                    return PaymentResponse.from(p);
+                }
+                throw new BusinessException(ErrorCode.PAYMENT_ALREADY_PROCESSED,
+                        "Payment with idempotency key " + req.getIdempotencyKey() + " is being processed");
+            }
+        }
+
+        String payeeAccount = req.getPayeeAccount() != null
+                && !req.getPayeeAccount().isBlank() ? req.getPayeeAccount() : MALL_SETTLEMENT;
+        String idempotencyKey = req.getIdempotencyKey() != null
+                ? req.getIdempotencyKey() : "AUTO-" + System.currentTimeMillis();
+
+        Payment payment = new Payment();
+        payment.setPayerAccount(req.getPayerAccount());
+        payment.setPayeeAccount(payeeAccount);
+        payment.setAmount(req.getAmount());
+        payment.setCurrency(req.getCurrency() != null ? req.getCurrency() : "CNY");
+        payment.setIdempotencyKey(idempotencyKey);
+        paymentRepo.save(payment);
+
+        boolean hasDebit = false;
+        try {
+            // Step 1: Debit payer
+            AccountServiceResponse.TransactionData debitResp = accountClient.debit(
+                    req.getPayerAccount(), req.getAmount(), idempotencyKey);
+            saveTxn(payment, debitResp.getTransactionNo(), "ACCOUNT", "DEBIT", "SUCCESS");
+            hasDebit = true;
+
+            // Step 2: Credit payee (mall settlement account)
+            AccountServiceResponse.TransactionData creditResp = accountClient.credit(
+                    payeeAccount, req.getAmount(), idempotencyKey);
+            saveTxn(payment, creditResp.getTransactionNo(), "ACCOUNT", "CREDIT", "SUCCESS");
+
+            payment.setStatus("COMPLETED");
+            log.info("Payment {} completed: {} debit, {} credit, amount={}",
+                    payment.getPaymentNo(), req.getPayerAccount(), payeeAccount, req.getAmount());
+        } catch (Exception e) {
+            if (hasDebit) {
+                // Compensation: debit succeeded but credit failed → reverse the debit
+                boolean reversed = reverseWithRetry(req.getPayerAccount(), req.getAmount(), idempotencyKey);
+                if (reversed) {
+                    saveTxn(payment, null, "ACCOUNT", "REVERSAL", "SUCCESS");
+                    payment.setStatus("FAILED");
+                    payment.setFailReason("Credit to " + payeeAccount + " failed. Reversal successful. "
+                            + "Original error: " + e.getMessage());
+                } else {
+                    payment.setStatus("ERROR_MANUAL_REVIEW");
+                    payment.setFailReason("Debit succeeded but credit+reverse both failed for "
+                            + req.getPayerAccount() + ". Credit error: " + e.getMessage()
+                            + ". Reverse retried " + MAX_REVERSE_RETRY + " times and failed.");
+                    log.error("Payment {} ERROR_MANUAL_REVIEW: debit OK, credit+reverse both failed",
+                            payment.getPaymentNo());
+                }
+            } else {
+                payment.setStatus("FAILED");
+                payment.setFailReason(e.getMessage());
+            }
+        }
+
+        paymentRepo.save(payment);
+        return PaymentResponse.from(payment);
+    }
+
+    /** Manual 3-retry loop — no spring-retry dependency. */
+    private boolean reverseWithRetry(String accountNo, BigDecimal amount, String idempotencyKey) {
+        for (int attempt = 0; attempt < MAX_REVERSE_RETRY; attempt++) {
+            try {
+                AccountServiceResponse.TransactionData revResp = accountClient.reverse(
+                        accountNo, "debit-" + idempotencyKey, idempotencyKey);
+                log.info("Reverse attempt {}/{} succeeded: txn={}", attempt + 1, MAX_REVERSE_RETRY,
+                        revResp.getTransactionNo());
+                return true;
+            } catch (Exception e) {
+                if (attempt == MAX_REVERSE_RETRY - 1) {
+                    log.error("Reverse exhausted after {} attempts for account {}",
+                            MAX_REVERSE_RETRY, accountNo, e);
+                    return false;
+                }
+                log.warn("Reverse attempt {}/{} failed, retrying...", attempt + 1, MAX_REVERSE_RETRY);
+            }
+        }
+        return false;
+    }
+
+    private void saveTxn(Payment payment, String transactionNo, String serviceName,
+                         String direction, String status) {
+        txnRepo.save(new PaymentTransaction(payment, transactionNo, serviceName, direction, status));
+    }
+}

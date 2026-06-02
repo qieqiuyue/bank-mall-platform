@@ -74,3 +74,4 @@ assets/screenshots/
 # === Test Reports ===
 **/test-output/
 **/surefire-reports/
+!infra/kubernetes/base/secret.yaml

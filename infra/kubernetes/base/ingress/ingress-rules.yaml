@@ -1,0 +1,49 @@
+# Bank Mall Ingress 路由规则
+# rewrite-target: /$2 含义：
+#   请求: /auth/api/auth/login → 转发给后端: /api/auth/login
+#   请求: /account/api/accounts/A1001/balance → 转发给后端: /api/accounts/A1001/balance
+#   $1 匹配 (/|$) 部分, $2 匹配 (.*) 即路径剩余部分
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bank-mall-ingress
+  namespace: bank-mall
+  labels:
+    app.kubernetes.io/part-of: bank-mall
+    app.kubernetes.io/component: ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /auth(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 8081
+      - path: /account(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: account-service
+            port:
+              number: 8082
+      - path: /payment(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: payment-service
+            port:
+              number: 8083
+      - path: /notification(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: notification-service
+            port:
+              number: 8084

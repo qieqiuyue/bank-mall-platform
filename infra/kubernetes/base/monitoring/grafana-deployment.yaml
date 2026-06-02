@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+    app.kubernetes.io/part-of: bank-mall
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+        app.kubernetes.io/part-of: bank-mall
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+        seccompProfile:
+          type: RuntimeDefault
+      nodeName: k8s-worker01
+      containers:
+      - name: grafana
+        image: grafana/grafana:10.4.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: web
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: admin
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: <GRAFANA_PASSWORD>
+        - name: GF_AUTH_ANONYMOUS_ENABLED
+          value: "true"
+        - name: GF_USERS_DEFAULT_THEME
+          value: "light"
+        - name: GF_UNIFIED_ALERTING_ENABLED
+          value: "true"
+        - name: GF_ALERTING_EXECUTE_ALERTS
+          value: "true"
+        volumeMounts:
+        - name: datasource
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: dashboard-provider
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: dashboards
+          mountPath: /etc/grafana/dashboards/bank-mall
+        - name: alerting
+          mountPath: /etc/grafana/provisioning/alerting
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "300m"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 60
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+      volumes:
+      - name: datasource
+        configMap:
+          name: grafana-config
+          items:
+          - key: datasource.yaml
+            path: datasource.yaml
+      - name: dashboard-provider
+        configMap:
+          name: grafana-config
+          items:
+          - key: dashboard-provider.yaml
+            path: dashboard-provider.yaml
+      - name: dashboards
+        configMap:
+          name: grafana-config
+          items:
+          - key: bank-mall-overview.json
+            path: overview.json
+      - name: alerting
+        configMap:
+          name: grafana-config
+          items:
+          - key: contact-points.yaml
+            path: contact-points.yaml
+          - key: notification-policies.yaml
+            path: notification-policies.yaml
+          - key: alert-rules.yaml
+            path: alert-rules.yaml
+      - name: grafana-data
+        emptyDir: {}

@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: bank-mall
+  labels:
+    app: auth-service
+    app.kubernetes.io/part-of: bank-mall
+    app.kubernetes.io/component: auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        app.kubernetes.io/part-of: bank-mall
+        app.kubernetes.io/component: auth
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8081"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: auth-service
+        image: 10.0.0.61/bank-mall/auth-service:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8081
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: bank-mall-config
+        - secretRef:
+            name: bank-mall-secret
+        env:
+        - name: SERVER_PORT
+          value: "8081"
+        - name: SPRING_APPLICATION_NAME
+          value: "auth-service"
+        livenessProbe:
+          httpGet:
+            path: /api/auth/health
+            port: 8081
+          initialDelaySeconds: 120
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /api/auth/health
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL

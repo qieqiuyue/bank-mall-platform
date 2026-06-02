@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-initdb
+  namespace: bank-mall
+  labels:
+    app: mysql
+    app.kubernetes.io/part-of: bank-mall
+  # NOTE: Contains DB credentials for initialization only.
+  # In production, use a sealed secret or init-job that reads from K8s Secrets.
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS bank_auth DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS bank_account DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS bank_payment DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS bank_notification DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS bank_product DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS bank_order DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS bank_inventory DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+    CREATE USER IF NOT EXISTS 'bankapp'@'%' IDENTIFIED BY '<DB_PASSWORD>';
+
+    GRANT ALL PRIVILEGES ON bank_auth.* TO 'bankapp'@'%';
+    GRANT ALL PRIVILEGES ON bank_account.* TO 'bankapp'@'%';
+    GRANT ALL PRIVILEGES ON bank_payment.* TO 'bankapp'@'%';
+    GRANT ALL PRIVILEGES ON bank_notification.* TO 'bankapp'@'%';
+    GRANT ALL PRIVILEGES ON bank_product.* TO 'bankapp'@'%';
+    GRANT ALL PRIVILEGES ON bank_order.* TO 'bankapp'@'%';
+    GRANT ALL PRIVILEGES ON bank_inventory.* TO 'bankapp'@'%';
+
+    FLUSH PRIVILEGES;

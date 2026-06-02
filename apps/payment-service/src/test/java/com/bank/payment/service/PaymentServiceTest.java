@@ -112,7 +112,6 @@ class PaymentServiceTest {
     void processPayment_debitFails() {
         when(paymentRepo.findByIdempotencyKey("KEY-004")).thenReturn(Optional.empty());
         when(paymentRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(txnRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(accountClient.debit(any(), any(), any()))
                 .thenThrow(new RuntimeException("Account unavailable"));
 

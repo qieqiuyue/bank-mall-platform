@@ -4,30 +4,32 @@ import com.bank.auth.entity.User;
 import com.bank.auth.repository.UserRepository;
 import com.bank.auth.util.JwtUtil;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.bean.MockBean;
+import org.springframework.boot.test.mock.bean.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
+@ActiveProfiles("test")
 class AuthControllerTest {
 
     @Autowired MockMvc mvc;
-    @MockBean UserRepository userRepository;
-    @MockBean BCryptPasswordEncoder passwordEncoder;
-    @MockBean JwtUtil jwtUtil;
+    @MockitoBean UserRepository userRepository;
+    @MockitoBean BCryptPasswordEncoder passwordEncoder;
+    @MockitoBean JwtUtil jwtUtil;
 
     @Test
     void login_success() throws Exception {
@@ -69,8 +71,9 @@ class AuthControllerTest {
 
     @Test
     void validate_validToken() throws Exception {
-        Claims mockClaims = io.jsonwebtoken.Jwts.claims().subject("U1001").build();
-        when(jwtUtil.validateToken("valid-token")).thenReturn(mockClaims);
+        // jjwt 0.12.x: use empty JwtBuilder to get a Claims instance for mocking
+        Claims mockClaims = Jwts.claims().add("sub", "U1001").build();
+        when(jwtUtil.validateToken("valid-token")).thenReturn((Claims) mockClaims);
 
         mvc.perform(post("/api/auth/validate")
                         .header("Authorization", "Bearer valid-token"))

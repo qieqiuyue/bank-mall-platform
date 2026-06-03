@@ -19,9 +19,11 @@ spec:
         app: jaeger
         app.kubernetes.io/part-of: bank-mall
     spec:
+      securityContext:
+        fsGroup: 1000
       containers:
       - name: jaeger
-        image: 10.0.0.61/bank-mall/jaeger-all-in-one:1.60
+        image: jaegertracing/all-in-one:1.60
         ports:
         - containerPort: 16686
           name: ui

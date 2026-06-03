@@ -25,8 +25,9 @@ spec:
     spec:
       volumes:
       - name: otel-agent
-        emptyDir: {}
-
+        hostPath:
+          path: /opt/otel
+          type: DirectoryOrCreate
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -34,13 +35,6 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-      - name: otel-agent-download
-        image: alpine:latest
-        command: ["sh","-c","wget -q -O /otel/opentelemetry-javaagent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar"]
-        volumeMounts:
-        - name: otel-agent
-          mountPath: /otel
 
       containers:
       - name: auth-service

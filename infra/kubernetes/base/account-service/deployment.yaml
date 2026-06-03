@@ -32,7 +32,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: account-service
-        image: 10.0.0.61/bank-mall/account-service:1.0.0
+        image: 10.0.0.61/bank-mall/account-service:2.0.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082

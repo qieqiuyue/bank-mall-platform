@@ -90,3 +90,4 @@ spec:
         volumeMounts:
         - name: otel-agent
           mountPath: /mnt/otel
+        imagePullPolicy: IfNotPresent

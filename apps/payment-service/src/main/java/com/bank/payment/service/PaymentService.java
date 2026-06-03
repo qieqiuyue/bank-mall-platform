@@ -2,6 +2,7 @@ package com.bank.payment.service;
 
 import com.bank.payment.client.AccountClient;
 import com.bank.payment.client.NotificationClient;
+import com.bank.payment.metrics.PaymentMetrics;
 import com.bank.payment.dto.AccountServiceResponse;
 import com.bank.payment.dto.PaymentRequest;
 import com.bank.payment.dto.PaymentResponse;

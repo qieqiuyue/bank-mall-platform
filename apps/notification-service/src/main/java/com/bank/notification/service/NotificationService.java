@@ -3,6 +3,7 @@ package com.bank.notification.service;
 import com.bank.notification.dto.NotificationRequest;
 import com.bank.notification.dto.NotificationResponse;
 import com.bank.notification.entity.Notification;
+import com.bank.notification.metrics.NotificationMetrics;
 import com.bank.notification.repository.NotificationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

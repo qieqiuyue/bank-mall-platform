@@ -29,15 +29,18 @@ public class PaymentService {
     private final PaymentTransactionRepository txnRepo;
     private final AccountClient accountClient;
     private final NotificationClient notificationClient;
+    private final PaymentMetrics metrics;
 
     public PaymentService(PaymentRepository paymentRepo,
                           PaymentTransactionRepository txnRepo,
                           AccountClient accountClient,
-                          NotificationClient notificationClient) {
+                          NotificationClient notificationClient,
+                          PaymentMetrics metrics) {
         this.paymentRepo = paymentRepo;
         this.txnRepo = txnRepo;
         this.accountClient = accountClient;
         this.notificationClient = notificationClient;
+        this.metrics = metrics;
     }
 
     public PaymentResponse getPayment(String paymentNo) {
@@ -49,6 +52,8 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse processPayment(PaymentRequest req) {
+        long start = System.currentTimeMillis();
+
         // Idempotency check
         if (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank()) {
             Optional<Payment> existing = paymentRepo.findByIdempotencyKey(req.getIdempotencyKey());
@@ -122,6 +127,8 @@ public class PaymentService {
         }
 
         paymentRepo.save(payment);
+        metrics.recordPayment(payment.getStatus());
+        metrics.recordDuration(System.currentTimeMillis() - start);
         return PaymentResponse.from(payment);
     }
 

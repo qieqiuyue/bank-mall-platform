@@ -23,12 +23,16 @@ public class AuthController {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
+    private final com.bank.auth.metrics.AuthMetrics metrics;
+
     public AuthController(UserRepository userRepository,
                           BCryptPasswordEncoder passwordEncoder,
-                          JwtUtil jwtUtil) {
+                          JwtUtil jwtUtil,
+                          com.bank.auth.metrics.AuthMetrics metrics) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.metrics = metrics;
     }
 
     @PostMapping("/login")
@@ -56,9 +60,11 @@ public class AuthController {
             String rolesStr = user.getRoles() != null ? user.getRoles() : "CUSTOMER";
             result.put("roles", Arrays.asList(rolesStr.split(",")));
             result.put("issuedAt", Instant.now().toString());
+            metrics.recordLogin("SUCCESS");
             return ApiResponse.success("Login successful", result);
         }
 
+        metrics.recordLogin("FAILED");
         return ApiResponse.error("AUTH_FAILED", "Invalid username or password");
     }
 

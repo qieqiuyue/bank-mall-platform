@@ -14,9 +14,11 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private final NotificationRepository repo;
+    private final NotificationMetrics metrics;
 
-    public NotificationService(NotificationRepository repo) {
+    public NotificationService(NotificationRepository repo, NotificationMetrics metrics) {
         this.repo = repo;
+        this.metrics = metrics;
     }
 
     @Transactional
@@ -28,6 +30,7 @@ public class NotificationService {
         n.setContent(req.getContent() != null ? req.getContent() : "Notification content");
         n.setStatus("SENT");
         repo.save(n);
+        metrics.recordSent(n.getStatus());
         return NotificationResponse.from(n);
     }
 

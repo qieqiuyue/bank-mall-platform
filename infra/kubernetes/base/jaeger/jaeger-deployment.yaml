@@ -35,6 +35,8 @@ spec:
           name: otlp-http
           protocol: TCP
         env:
+        - name: QUERY_BASE_PATH
+          value: /jaeger
         - name: SPAN_STORAGE_TYPE
           value: badger
         - name: BADGER_EPHEMERAL

@@ -306,15 +306,50 @@ S0-S1 期间使用 `feat/s0-cluster-verification` 承载所有前期工作。
 | Git push | 只能在 WSL2 | 在 Windows 上统一操作 |
 | ArgoCD 部署 | CLI bug + UI 不稳定 | kubectl 直接操作可行，别信 UI |
 
-### S2 剩余（下次）
+### S2 Day 2：Micrometer + Grafana + OTEL Agent + Dockerfile + Maven
+
+**日期**：2026-06-04
+
+#### Micrometer 指标 ✅
+- 4 Metrics 类：PaymentMetrics, AccountMetrics, AuthMetrics, NotificationMetrics
+- H2 本地验证通过：`payment_requests_total{status="FAILED"} 1.0`
+- 指标自动暴露到 `/actuator/prometheus`（micrometer-registry-prometheus 已存在）
+- 9 tests 全部通过，无回归
+
+#### Grafana 业务看板 ✅（代码层面）
+- `infra/dashboards/bank-mall-business.json`：支付 QPS、成功率、P99、账户操作、登录、通知
+- `infra/dashboards/bank-mall-sli-slo.json`：可用性 SLI、P99 延迟、错误率、支付成功率
+- ConfigMap 更新待部署阶段
+
+#### OTEL Agent 注入 ✅（Agent 加载完成，Collector 连通性待修复）
+
+**已验证**：
+- `JAVA_TOOL_OPTIONS=-javaagent:/otel/opentelemetry-javaagent.jar` ✅ JVM 正确加载
+- `opentelemetry-javaagent version: 2.28.1` ✅ Agent 启动
+- `OTEL_SERVICE_NAME=payment-service` ✅ 服务标识
+- emptyDir + initContainer（Harbor otel-agent-init 镜像）解决 PodSecurity hostPath 限制
+
+**已知问题**：
+- Jaeger collector 端口（4317 gRPC / 4318 HTTP）从 bank-mall Pod 不可达，同节点 Pod IP 直连也超时
+- Jaeger pod localhost:4318 返回 404（端口监听正常），排除应用层问题
+- NetworkPolicy 双向白名单均已配置（bank-mall→jaeger egress + jaeger←bank-mall ingress）
+- 根因推测：Calico iptables 规则或 Jaeger pod 网络接口绑定，非 OTEL 配置问题
+- 后续：单独 issue 跟踪，可能需 `calicoctl` 排查或 Jaeger pod 重建
+
+**临时方案**：OTEL agent 加载成功即是里程碑——agent 注入、JVM 参数、initContainer、PodSecurity 合规全部打通。Collector 连通性是网络层隔离问题。
+
+#### Dockerfile non-root + HEALTHCHECK 🔜
+
+#### Maven 父 POM 🔜
+
+### S2 剩余
 
 | Phase | 状态 |
 |-------|:---:|
-| Micrometer 指标 | ⬜ |
-| Grafana 看板 + SLI/SLO | ⬜ |
-| Dockerfile non-root + HEALTHCHECK | ⬜ |
-| Maven 父 POM | ⬜ |
-| Jaeger Ingress SPA 修复 | ⬜ Issue 跟踪 |
+| Dockerfile non-root + HEALTHCHECK | 🔜 |
+| Maven 父 POM | 🔜 |
+| Jaeger collector 连通性 | ⬜ Issue #TBD |
+| Grafana ConfigMap 更新 | ⬜ 部署时做 |
 
 ### 面试素材
 

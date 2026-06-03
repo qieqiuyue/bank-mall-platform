@@ -25,9 +25,7 @@ spec:
     spec:
       volumes:
       - name: otel-agent
-        hostPath:
-          path: /opt/otel
-          type: DirectoryOrCreate
+        emptyDir: {}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -82,3 +80,13 @@ spec:
           limits:
             cpu: 500m
             memory: 512Mi
+      initContainers:
+      - name: otel-agent-init
+        image: 10.0.0.61/bank-mall/otel-agent-init:latest
+        command:
+        - sh
+        - -c
+        - cp /otel/opentelemetry-javaagent.jar /mnt/otel/
+        volumeMounts:
+        - name: otel-agent
+          mountPath: /mnt/otel

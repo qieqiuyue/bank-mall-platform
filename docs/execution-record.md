@@ -245,3 +245,81 @@ S0-S1 期间使用 `feat/s0-cluster-verification` 承载所有前期工作。
 2. WSL2：`git checkout main && git pull && git branch -d feat/s0-cluster-verification`
 3. WSL2：`git checkout -b feat/notification-service`（CP3 开发）
 4. VM：`git checkout main && git pull origin main`（永远拉 main 部署）
+
+---
+
+## S2 Day 1：Jaeger + ArgoCD + Sealed Secrets + 安全加固
+
+**日期**：2026-06-03  
+**计划时间**：56h（全 S2）→ **Day 1 实际**：~10h  
+**状态**：PDB/Quota/Limits ✅ | deploy.sh fix ✅ | Jaeger ✅ | ArgoCD ✅ | Sealed Secrets ✅
+
+### 产出
+
+| 模块 | 文件 | 关键决策 |
+|------|------|---------|
+| PDB | 4 服务 minAvailable=1 | 防 kubectl drain 杀光 |
+| ResourceQuota | bank-mall cpu:8 mem:16Gi | namespace 级资源隔离 |
+| LimitRange | 默认 100m/256Mi | 容器必须声明 resources |
+| deploy.sh | `k8s/base` → `infra/kubernetes/base` | 路径 Bug 修了 |
+| Jaeger | all-in-one + PVC + Badger + OTEL agent | 零代码注入，initContainer 下载 |
+| ArgoCD | CRD + 3 Application CRs + auto-sync | GitOps 集群改 Go push |
+| Sealed Secrets | controller + kubeseal + 加密 | 零明文 secret 存 Git |
+| NetworkPolicy | Jaeger ingress/egress + port 16686 | 每次加服务必更新 |
+
+### 踩坑（按严重程度）
+
+#### 🔴 P0：ArgoCD selfHeal 覆盖手动部署
+- **现象**：ArgoCD sync 后 account-service 被回滚到 SB 3.1.3 + JDK 17 旧镜像
+- **根因**：Git 里 deployment.yaml 的 image tag 是 `1.0.0`，集群里是 `kubectl set image` 改的 `2.0.0`。ArgoCD selfHeal 把集群拉回 Git 状态
+- **解决**：更新 Git 中 4 个 deployment.yaml 的 image tag 为 `2.0.0`，Git 成为唯一真相源
+- **教训**：**GitOps 启用后，任何 kubectl 直接改集群都会被覆盖。** 所有变更必须走 Git → ArgoCD
+
+#### 🔴 P1：GitHub 文件下载域名被墙
+- **现象**：`curl https://github.com/.../kubeseal-0.27.3-linux-amd64.tar.gz` 在 VM 和 WSL2 都超时
+- **根因**：GitHub API 通（`api.github.com`），但文件下载走 `objects.githubusercontent.com`，该域名被 GFW 阻
+- **解决**：Windows 浏览器下载 → scp 到 VM
+- **长期方案**：建一个内部静态文件服务（Harbor 或 Nginx），缓存常用二进制
+
+#### 🟡 P2：Jaeger Ingress SPA 路径冲突
+- **现象**：浏览器访问 `/jaeger/` HTML 正常，但页面全白。JS module 加载报 MIME type error
+- **根因**：Ingress rewrite `/$2` 把 `/jaeger/static/foo.js` 重写为 `/static/foo.js`，Jaeger 返回 HTML
+- **临时方案**：port-forward 替代 Ingress，后续需单独 issue 跟踪
+
+#### 🟡 P3：containerd 镜像拉取不稳定
+- **现象**：worker01 拉 quay.io 卡住，worker02 正常；worker02 拉 docker.io 不通
+- **根因**：GFW 对不同节点的 TCP 干扰不同
+- **解决**：Harbor 中转镜像 → worker 从 Harbor 拉
+
+#### 🟢 P4：kubectl port-forward 端口残留
+- **现象**：`kubectl port-forward` 被 kill 后端口不释放
+- **解决**：`pkill -9 -f "port-forward"` 全清
+
+### 工作流改进建议
+
+| 问题 | 现状 | 改进 |
+|------|------|------|
+| 二进制下载 | curl GitHub → 超时 | Windows 浏览器下 → scp |
+| 镜像拉取 | 每节点分别试 | Harbor 统一中转 |
+| NetworkPolicy | 反复漏端口 | 加新服务模板 checklist |
+| 多行粘贴 | heredoc 失败 | 推 GitHub 再 pull 或单行 echo |
+| Git push | 只能在 WSL2 | 在 Windows 上统一操作 |
+| ArgoCD 部署 | CLI bug + UI 不稳定 | kubectl 直接操作可行，别信 UI |
+
+### S2 剩余（下次）
+
+| Phase | 状态 |
+|-------|:---:|
+| Micrometer 指标 | ⬜ |
+| Grafana 看板 + SLI/SLO | ⬜ |
+| Dockerfile non-root + HEALTHCHECK | ⬜ |
+| Maven 父 POM | ⬜ |
+| Jaeger Ingress SPA 修复 | ⬜ Issue 跟踪 |
+
+### 面试素材
+
+**"你怎么处理国内开源的网络问题？"**
+> 两种策略。镜像走 Harbor 中转——harbor01 上的 Docker 配了 NJU 镜像加速，拉下来后推到本地 Harbor，worker 节点从 Harbor 拉。二进制文件走 Windows 下载再 scp 进内网。ArgoCD 和 Jaeger 的 quay.io 镜像都是这么部署的。生产环境方案是阿里云 ACR 的海外同步功能。
+
+**"Sealed Secrets 的原理？"**
+> kubeseal 用 controller 的公钥加密 K8s Secret → 生成 SealedSecret CR → 存 Git → ArgoCD 同步到集群 → controller 用私钥解密创建真正的 Secret。加密后的内容在 Git 里就是一堆 base64，无法反推明文。密钥轮换时 controller 自动生成新密钥对，旧的 SealedSecret 仍然可解密。比 External Secrets + Vault 少一层外部依赖。

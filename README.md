@@ -1,7 +1,7 @@
 # Bank Mall Cloud-Native Platform
 
 > 某城商行电子商城云原生平台 — 独立设计并交付的完整平台工程项目。
-> **当前状态：S1 CP1 完成** | 账户服务重写 + 认证服务 JWT 改造已部署上线。
+> **当前状态：S1 业务最小闭环 全部完成 ✅** | 4 服务全链路闭环：支付→扣款→入账→通知落库。41 tests, SB 4.0.6 + JDK 21 全对齐。
 
 ![Java](https://img.shields.io/badge/Java_21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot_4.0.6-6DB33F?logo=spring&logoColor=white)
@@ -12,8 +12,8 @@
 ![License](https://img.shields.io/badge/License-MIT-3DA639)
 
 ![S0](https://img.shields.io/badge/Phase-S0_Complete-success)
-![S1](https://img.shields.io/badge/Phase-S1_CP1_Done-success)
-![S2](https://img.shields.io/badge/Phase-S2_Platform-inactive)
+![S1](https://img.shields.io/badge/Phase-S1_Complete-success)
+![S2](https://img.shields.io/badge/Phase-S2_Platform-blue)
 ![S3](https://img.shields.io/badge/Phase-S3_CICD-inactive)
 ![S4](https://img.shields.io/badge/Phase-S4_Chaos-inactive)
 ![S5](https://img.shields.io/badge/Phase-S5_Polish-inactive)

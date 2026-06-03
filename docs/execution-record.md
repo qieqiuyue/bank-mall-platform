@@ -246,162 +246,78 @@ S0-S1 期间使用 `feat/s0-cluster-verification` 承载所有前期工作。
 3. WSL2：`git checkout -b feat/notification-service`（CP3 开发）
 4. VM：`git checkout main && git pull origin main`（永远拉 main 部署）
 
----
+## S1 CP3：notification-service 新写 + 全链路验证 + S1 完结
 
-## S2 Day 1：Jaeger + ArgoCD + Sealed Secrets + 安全加固
-
-**日期**：2026-06-03  
-**计划时间**：56h（全 S2）→ **Day 1 实际**：~10h  
-**状态**：PDB/Quota/Limits ✅ | deploy.sh fix ✅ | Jaeger ✅ | ArgoCD ✅ | Sealed Secrets ✅
+**日期**：2026-06-03 凌晨  
+**计划时间**：10h → **实际**：约 3h  
+**状态**：✅ 完成 — S1 业务最小闭环全部交付
 
 ### 产出
 
-| 模块 | 文件 | 关键决策 |
-|------|------|---------|
-| PDB | 4 服务 minAvailable=1 | 防 kubectl drain 杀光 |
-| ResourceQuota | bank-mall cpu:8 mem:16Gi | namespace 级资源隔离 |
-| LimitRange | 默认 100m/256Mi | 容器必须声明 resources |
-| deploy.sh | `k8s/base` → `infra/kubernetes/base` | 路径 Bug 修了 |
-| Jaeger | all-in-one + PVC + Badger + OTEL agent | 零代码注入，initContainer 下载 |
-| ArgoCD | CRD + 3 Application CRs + auto-sync | GitOps 集群改 Go push |
-| Sealed Secrets | controller + kubeseal + 加密 | 零明文 secret 存 Git |
-| NetworkPolicy | Jaeger ingress/egress + port 16686 | 每次加服务必更新 |
+| 维度 | 数值 |
+|------|------|
+| 新建文件 | 14（notification-service）+ 1（NotificationClient） |
+| 修改文件 | 1（deployment.yaml） |
+| 测试 | 6 新增 + 9 payment 无回归 = 15 tests |
+| 新增表 | notifications |
+| 全链路 | payment → account(debit+credit) → notification 落库 |
 
-### 踩坑（按严重程度）
+### 踩坑
 
-#### 🔴 P0：ArgoCD selfHeal 覆盖手动部署
-- **现象**：ArgoCD sync 后 account-service 被回滚到 SB 3.1.3 + JDK 17 旧镜像
-- **根因**：Git 里 deployment.yaml 的 image tag 是 `1.0.0`，集群里是 `kubectl set image` 改的 `2.0.0`。ArgoCD selfHeal 把集群拉回 Git 状态
-- **解决**：更新 Git 中 4 个 deployment.yaml 的 image tag 为 `2.0.0`，Git 成为唯一真相源
-- **教训**：**GitOps 启用后，任何 kubectl 直接改集群都会被覆盖。** 所有变更必须走 Git → ArgoCD
+#### 坑 1：NotifyApplication.java 漏写
+- **现象**：`ClassNotFoundException: com.bank.notification.NotifyApplication`，JAR 打包无主类
+- **根因**：写入时被权限系统拦截，13 个 Java 文件中漏了主类
+- **教训**：写完文件后 `find src -name "*.java" | wc -l` + 检查关键文件名
 
-#### 🔴 P1：GitHub 文件下载域名被墙
-- **现象**：`curl https://github.com/.../kubeseal-0.27.3-linux-amd64.tar.gz` 在 VM 和 WSL2 都超时
-- **根因**：GitHub API 通（`api.github.com`），但文件下载走 `objects.githubusercontent.com`，该域名被 GFW 阻
-- **解决**：Windows 浏览器下载 → scp 到 VM
-- **长期方案**：建一个内部静态文件服务（Harbor 或 Nginx），缓存常用二进制
+#### 坑 2：Docker 缓存未清
+- **现象**：加了 NotifyApplication 重新推送后，Harbor 上的镜像 digest 不变
+- **根因**：Docker 多层缓存，`mvn clean package -DskipTests` 之后 `docker build` 仍用缓存
+- **解决**：`docker build --no-cache` 强制重打
 
-#### 🟡 P2：Jaeger Ingress SPA 路径冲突
-- **现象**：浏览器访问 `/jaeger/` HTML 正常，但页面全白。JS module 加载报 MIME type error
-- **根因**：Ingress rewrite `/$2` 把 `/jaeger/static/foo.js` 重写为 `/static/foo.js`，Jaeger 返回 HTML
-- **临时方案**：port-forward 替代 Ingress，后续需单独 issue 跟踪
+#### 坑 3：Git 分支混乱
+- **现象**：feat/notification-service 从 main 建，但 main 上无 notification-service 目录
+- **根因**：WSL2 本地 main 与 GitHub main 不同步（main 保护分支）
+- **解决**：手动 force push rebase 到正确基线
 
-#### 🟡 P3：containerd 镜像拉取不稳定
-- **现象**：worker01 拉 quay.io 卡住，worker02 正常；worker02 拉 docker.io 不通
-- **根因**：GFW 对不同节点的 TCP 干扰不同
-- **解决**：Harbor 中转镜像 → worker 从 Harbor 拉
+### 验证结果
 
-#### 🟢 P4：kubectl port-forward 端口残留
-- **现象**：`kubectl port-forward` 被 kill 后端口不释放
-- **解决**：`pkill -9 -f "port-forward"` 全清
-
-### 工作流改进建议
-
-| 问题 | 现状 | 改进 |
-|------|------|------|
-| 二进制下载 | curl GitHub → 超时 | Windows 浏览器下 → scp |
-| 镜像拉取 | 每节点分别试 | Harbor 统一中转 |
-| NetworkPolicy | 反复漏端口 | 加新服务模板 checklist |
-| 多行粘贴 | heredoc 失败 | 推 GitHub 再 pull 或单行 echo |
-| Git push | 只能在 WSL2 | 在 Windows 上统一操作 |
-| ArgoCD 部署 | CLI bug + UI 不稳定 | kubectl 直接操作可行，别信 UI |
-
-### S2 Day 2：Micrometer + Grafana + OTEL Agent + Dockerfile + Maven
-
-**日期**：2026-06-04
-
-#### Micrometer 指标 ✅
-- 4 Metrics 类：PaymentMetrics, AccountMetrics, AuthMetrics, NotificationMetrics
-- H2 本地验证通过：`payment_requests_total{status="FAILED"} 1.0`
-- 指标自动暴露到 `/actuator/prometheus`（micrometer-registry-prometheus 已存在）
-- 9 tests 全部通过，无回归
-
-#### Grafana 业务看板 ✅（代码层面）
-- `infra/dashboards/bank-mall-business.json`：支付 QPS、成功率、P99、账户操作、登录、通知
-- `infra/dashboards/bank-mall-sli-slo.json`：可用性 SLI、P99 延迟、错误率、支付成功率
-- ConfigMap 更新待部署阶段
-
-#### OTEL Agent 注入 ✅（Agent 加载完成，Collector 连通性待修复）
-
-**已验证**：
-- `JAVA_TOOL_OPTIONS=-javaagent:/otel/opentelemetry-javaagent.jar` ✅ JVM 正确加载
-- `opentelemetry-javaagent version: 2.28.1` ✅ Agent 启动
-- `OTEL_SERVICE_NAME=payment-service` ✅ 服务标识
-- emptyDir + initContainer（Harbor otel-agent-init 镜像）解决 PodSecurity hostPath 限制
-
-**已知问题**：
-- Jaeger collector 端口（4317 gRPC / 4318 HTTP）从 bank-mall Pod 不可达，同节点 Pod IP 直连也超时
-- Jaeger pod localhost:4318 返回 404（端口监听正常），排除应用层问题
-- NetworkPolicy 双向白名单均已配置（bank-mall→jaeger egress + jaeger←bank-mall ingress）
-- 根因推测：Calico iptables 规则或 Jaeger pod 网络接口绑定，非 OTEL 配置问题
-- 后续：单独 issue 跟踪，可能需 `calicoctl` 排查或 Jaeger pod 重建
-
-**临时方案**：OTEL agent 加载成功即是里程碑——agent 注入、JVM 参数、initContainer、PodSecurity 合规全部打通。Collector 连通性是网络层隔离问题。
-
-#### Dockerfile non-root + HEALTHCHECK ✅（2026-06-04 完成）
-- 4 个 Dockerfile 全部多阶段：`maven:3.9-eclipse-temurin-21-alpine` → `eclipse-temurin:21-alpine`
-- `RUN addgroup -S appgroup && adduser -S appuser -G appgroup` + `USER appuser`
-- `HEALTHCHECK` 用 wget 探活，与 K8s liveness probe 互补
-
-#### Maven 父 POM ✅（2026-06-04 完成）
-- `apps/pom.xml`：SB 4.0.6 + JDK 21 + jjwt 0.12.6 统一版本管理
-- 4 个子模块：auth-service, account-service, payment-service, notification-service
-
-### S2 Day 3：全链路调试 + 3 个 Fix（2026-06-04）
-
-**耗时**：~8h 集群调试
-
-#### 修复 1：Jaeger collector 连通性 ✅
-
-**症状**：payment Pod → Jaeger `wget` 超时，OTEL `Failed to export spans`
-
-**排查过程**（5 层弯路，详见 `docs/14-troubleshooting-handbook.md` §六）：
-1. 怀疑 Calico IPIP 跨节点 → 迁同节点仍超时，排除
-2. 怀疑多 egress policy 聚合 → 合并后仍超时
-3. 怀疑 kube-proxy Service → Jaeger 连自己 ClusterIP 也超时（干扰信号）
-4. 怀疑 egress deny-all → 删后仍超时
-5. **怀疑 jaeger ingress 策略 → 删后通了！apply 回去不通**
-
-**根因**：jaeger ingress NetworkPolicy 用 `namespaceSelector: {name: bank-mall}` 匹配来源，但 `bank-mall` namespace 缺少 `name=bank-mall` 标签。K8s `kubernetes.io/metadata.name` 不会模糊匹配 `matchLabels` 的 `name` key。
-
-**修复**：
 ```bash
-kubectl label ns bank-mall name=bank-mall
+# 全链路成功
+POST /payment/api/payments → COMPLETED, paymentNo: a56c82b5-...
+GET /notification/api/notifications?accountNo=A1001 → 1 record, status: SENT
+A1001 balance: 8888.88 → 8289.88 (累计 -599)
+
+# S1 全部服务
+auth:       JWT login ✅  BCrypt ✅
+account:    debit/credit/reverse ✅  乐观锁 ✅  幂等 ✅
+payment:    RestClient 跨服务 ✅  补偿 ✅  ERROR_MANUAL_REVIEW ✅
+notification: 支付通知落库 ✅  写入即完成 ✅
 ```
-同步到 Git：`infra/kubernetes/base/namespace.yaml` 加 `name: bank-mall` label。
-
-**结论**：这条策略从项目 A 时代起就无效，S2 第一次有跨 ns 流量才暴露。
-
-#### 修复 2：PSA restricted warning ✅
-
-4 个 deployment 的主容器和 otel-agent-init 补容器级 `securityContext`（`allowPrivilegeEscalation: false` + `capabilities.drop: [ALL]`）。
-
-#### 修复 3：Jaeger runAsNonRoot 回退 ✅
-
-Jaeger Go 二进制以 root 运行，PVC 已有 root 数据。撤 `runAsNonRoot`/`runAsUser`，保留 `fsGroup: 1000` + 容器级 securityContext。
-
-#### Liveness probe 120→180
-
-OTEL agent 加载增加约 30s 启动时间，慢节点总启动超 120s。payment/account/notification 三个服务的 `livenessProbe.initialDelaySeconds` 改为 180。
-
-### S2 最终状态
-
-| Phase | 状态 |
-|-------|:---:|
-| Dockerfile non-root + HEALTHCHECK | ✅ |
-| Maven 父 POM | ✅ |
-| Jaeger collector 连通性 | ✅ namespace label fix |
-| Grafana ConfigMap 更新 | ✅ `infra/dashboards/` 已嵌入 |
-| PSA restricted warning | ✅ 零 warning |
-| liveness OTEL 延迟 | ✅ 120→180 |
-| NetworkPolicy 跨 ns | ✅ jaeger ingress port 16686 |
-
-**S2 整体交付**：6 个能力域全部完成，交付率 93%（Semgrep/Gitleaks 属 S3）。GitHub `feat/s2-platform-matrix` 分支，commit `57c6041`。
 
 ### 面试素材
 
-**"你怎么处理国内开源的网络问题？"**
-> 两种策略。镜像走 Harbor 中转——harbor01 上的 Docker 配了 NJU 镜像加速，拉下来后推到本地 Harbor，worker 节点从 Harbor 拉。二进制文件走 Windows 下载再 scp 进内网。ArgoCD 和 Jaeger 的 quay.io 镜像都是这么部署的。生产环境方案是阿里云 ACR 的海外同步功能。
+**"为什么 notification-service 只写不发送？"**
+> notification-service 收到请求后落库标记 SENT，不实际调用短信/邮件网关。这是有意为之——支付服务不关心通知怎么送达，只关心记录是否落库。生产环境接入短信通道是配置级变更：换一个 NotificationService 实现即可，支付链路零改动。这体现了服务间的最小知识原则。
 
-**"Sealed Secrets 的原理？"**
-> kubeseal 用 controller 的公钥加密 K8s Secret → 生成 SealedSecret CR → 存 Git → ArgoCD 同步到集群 → controller 用私钥解密创建真正的 Secret。加密后的内容在 Git 里就是一堆 base64，无法反推明文。密钥轮换时 controller 自动生成新密钥对，旧的 SealedSecret 仍然可解密。比 External Secrets + Vault 少一层外部依赖。
+### S1 总计
+
+| 指标 | 数值 |
+|------|------|
+| 重写服务 | 3（account + payment + notification） |
+| 改造服务 | 1（auth JWT + BCrypt） |
+| 新增测试 | 41 tests（26+9+6） |
+| 计划时间 | 47h |
+| 实际时间 | ~15h |
+| 踩坑文档化 | 20 个（3 S0 + 8 CP1 + 5 CP2 + 3 CP3 + 1 分支） |
+| K8s 镜像 | 4 × 2.0.0 |
+
+### 分支策略（实际情况）
+
+最终使用 `feat/notification-service` 分支开发 CP3。因 main 分支受 GitHub 保护，通过 PR 合并：
+1. `feat/s0-cluster-verification`（S0+CP1+CP2）→ PR → main（已合并）
+2. `feat/notification-service`（CP3）→ PR → main（待合并）
+3. VM harbor01/master01 使用 `feat/notification-service`，后续统一切 main
+
+---
+
+## S2 Day 1：Jaeger + ArgoCD + Sealed Secrets + 安全加固

@@ -3,5 +3,6 @@ kind: Namespace
 metadata:
   name: bank-mall
   labels:
+    name: bank-mall
     app.kubernetes.io/part-of: bank-mall
     app.kubernetes.io/managed-by: kubectl

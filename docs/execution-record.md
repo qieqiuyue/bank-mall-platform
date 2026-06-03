@@ -338,18 +338,65 @@ S0-S1 期间使用 `feat/s0-cluster-verification` 承载所有前期工作。
 
 **临时方案**：OTEL agent 加载成功即是里程碑——agent 注入、JVM 参数、initContainer、PodSecurity 合规全部打通。Collector 连通性是网络层隔离问题。
 
-#### Dockerfile non-root + HEALTHCHECK 🔜
+#### Dockerfile non-root + HEALTHCHECK ✅（2026-06-04 完成）
+- 4 个 Dockerfile 全部多阶段：`maven:3.9-eclipse-temurin-21-alpine` → `eclipse-temurin:21-alpine`
+- `RUN addgroup -S appgroup && adduser -S appuser -G appgroup` + `USER appuser`
+- `HEALTHCHECK` 用 wget 探活，与 K8s liveness probe 互补
 
-#### Maven 父 POM 🔜
+#### Maven 父 POM ✅（2026-06-04 完成）
+- `apps/pom.xml`：SB 4.0.6 + JDK 21 + jjwt 0.12.6 统一版本管理
+- 4 个子模块：auth-service, account-service, payment-service, notification-service
 
-### S2 剩余
+### S2 Day 3：全链路调试 + 3 个 Fix（2026-06-04）
+
+**耗时**：~8h 集群调试
+
+#### 修复 1：Jaeger collector 连通性 ✅
+
+**症状**：payment Pod → Jaeger `wget` 超时，OTEL `Failed to export spans`
+
+**排查过程**（5 层弯路，详见 `docs/14-troubleshooting-handbook.md` §六）：
+1. 怀疑 Calico IPIP 跨节点 → 迁同节点仍超时，排除
+2. 怀疑多 egress policy 聚合 → 合并后仍超时
+3. 怀疑 kube-proxy Service → Jaeger 连自己 ClusterIP 也超时（干扰信号）
+4. 怀疑 egress deny-all → 删后仍超时
+5. **怀疑 jaeger ingress 策略 → 删后通了！apply 回去不通**
+
+**根因**：jaeger ingress NetworkPolicy 用 `namespaceSelector: {name: bank-mall}` 匹配来源，但 `bank-mall` namespace 缺少 `name=bank-mall` 标签。K8s `kubernetes.io/metadata.name` 不会模糊匹配 `matchLabels` 的 `name` key。
+
+**修复**：
+```bash
+kubectl label ns bank-mall name=bank-mall
+```
+同步到 Git：`infra/kubernetes/base/namespace.yaml` 加 `name: bank-mall` label。
+
+**结论**：这条策略从项目 A 时代起就无效，S2 第一次有跨 ns 流量才暴露。
+
+#### 修复 2：PSA restricted warning ✅
+
+4 个 deployment 的主容器和 otel-agent-init 补容器级 `securityContext`（`allowPrivilegeEscalation: false` + `capabilities.drop: [ALL]`）。
+
+#### 修复 3：Jaeger runAsNonRoot 回退 ✅
+
+Jaeger Go 二进制以 root 运行，PVC 已有 root 数据。撤 `runAsNonRoot`/`runAsUser`，保留 `fsGroup: 1000` + 容器级 securityContext。
+
+#### Liveness probe 120→180
+
+OTEL agent 加载增加约 30s 启动时间，慢节点总启动超 120s。payment/account/notification 三个服务的 `livenessProbe.initialDelaySeconds` 改为 180。
+
+### S2 最终状态
 
 | Phase | 状态 |
 |-------|:---:|
-| Dockerfile non-root + HEALTHCHECK | 🔜 |
-| Maven 父 POM | 🔜 |
-| Jaeger collector 连通性 | ⬜ Issue #TBD |
-| Grafana ConfigMap 更新 | ⬜ 部署时做 |
+| Dockerfile non-root + HEALTHCHECK | ✅ |
+| Maven 父 POM | ✅ |
+| Jaeger collector 连通性 | ✅ namespace label fix |
+| Grafana ConfigMap 更新 | ✅ `infra/dashboards/` 已嵌入 |
+| PSA restricted warning | ✅ 零 warning |
+| liveness OTEL 延迟 | ✅ 120→180 |
+| NetworkPolicy 跨 ns | ✅ jaeger ingress port 16686 |
+
+**S2 整体交付**：6 个能力域全部完成，交付率 93%（Semgrep/Gitleaks 属 S3）。GitHub `feat/s2-platform-matrix` 分支，commit `57c6041`。
 
 ### 面试素材
 

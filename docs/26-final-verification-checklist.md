@@ -79,15 +79,27 @@ curl -X POST http://<node-ip>:30080/notification/api/notifications \
 | Loki 存储存在 | `k8s/base/monitoring/loki-storage.yaml` | `rg -n "PersistentVolume|PersistentVolumeClaim|/data/loki" k8s/base/monitoring/loki-storage.yaml` | `kubectl get pv,pvc -n monitoring` | Loki PVC Bound，实验环境使用 hostPath |
 | Promtail DaemonSet 采集日志 | `k8s/base/monitoring/promtail-daemonset.yaml`、`promtail-configmap.yaml` | `rg -n "kind: DaemonSet|bank-mall|monitoring|ingress-nginx" k8s/base/monitoring/promtail-*` | `kubectl get ds,pods -n monitoring -l app=promtail` | 每个节点有 Promtail Pod，日志能在 Loki/Grafana Explore 查询 |
 
+## S2 已落地能力（2026-06-04 验证通过）
+
+| 能力 | 当前状态 | 验收方式 | 面试口径 |
+|------|----------|----------|----------|
+| ArgoCD GitOps | ✅ 已落地 | `infra/kubernetes/base/argocd/` 3 个 Application CR，auto-sync+prune+selfHeal | 仓库 watch `infra/kubernetes/base/`，3 个 App 分层管理（apps/monitoring/infra） |
+| OpenTelemetry / Jaeger | ✅ 已落地 | `infra/kubernetes/base/jaeger/` 完整部署，4 服务 OTEL initContainer 注入 | Jaeger all-in-one 1.60 + Badger + PVC + Recreate，OTEL agent 3 次迭代（hostPath→initContainer→Harbor 镜像） |
+| Sealed Secrets | ✅ 已落地 | `infra/kubernetes/base/sealed-bank-mall.yaml`，8 密钥全加密 | namespace-wide scope，Git 零明文，commit d4cee0e 删除了 plain secret.yaml |
+| PDB + ResourceQuota + LimitRange | ✅ 已落地 | `infra/kubernetes/base/security/pdb.yaml` `limit-range.yaml` `resource-quota.yaml` | 4 服务 PDB minAvailable=1 + namespace 级资源配额 |
+| Dockerfile 多阶段 + 非 root + HEALTHCHECK | ✅ 已落地 | `apps/*/Dockerfile` 全部 4 个 | maven:3.9-temurin-21 → eclipse-temurin:21-alpine，USER appuser，wget HEALTHCHECK |
+| Maven 父 POM | ✅ 已落地 | `apps/pom.xml` | SB 4.0.6 + JDK 21 + jjwt 0.12.6 统一管理 |
+| .dockerignore | ✅ 已落地 | 项目根目录 `.dockerignore` | 55 行，覆盖 target/IDE/secrets/.git |
+
 ## 未落地规划
 
 | 能力 | 当前状态 | 验收方式 | 面试口径 |
 |------|----------|----------|----------|
-| Redis | 未落地 | `rg -n "kind:.*Redis|redis" k8s/base bank-digital-platform` 不应发现实际部署/依赖 | V2 缓存规划，当前不宣称已部署 |
-| OpenTelemetry / Jaeger | 未落地 | `rg -n "JAEGER_ENDPOINT|jaeger-collector" k8s/base` 不应命中 | V2 链路追踪规划，当前不宣称已接入 |
-| AlertManager HA | 未落地 | `rg -n "kind:.*Alertmanager|alertmanager" k8s/base` 不应命中 | V1 用 Grafana Alerting；生产/多集群再接 AlertManager |
-| product/order/inventory | 未落地 | `Test-Path bank-digital-platform/product-service` 等目录应为 false | V2 业务增强规划 |
+| Redis | 未落地 | `rg -n "kind:.*Redis|redis" infra/kubernetes/base apps` 不应发现实际部署/依赖 | V2 缓存规划，当前不宣称已部署 |
+| AlertManager HA | 未落地 | `rg -n "kind:.*Alertmanager|alertmanager" infra/kubernetes/base` 不应命中 | V1 用 Grafana Alerting；生产/多集群再接 AlertManager |
+| product/order/inventory | 未落地 | `apps/product-service` 等目录应为 false | V2 业务增强规划 |
 | 多 master HA | 未落地 | README 拓扑仍为 `k8s-master01` 单控制面 | V1 实验集群，V2 设计 3 master + LB + etcd 备份 |
+| Semgrep / Gitleaks | S3 计划 | `pipelines/semgrep/` `pipelines/gitleaks/` 待创建 | S3 CI/CD 阶段实现 |
 
 ## 一次性静态核查
 

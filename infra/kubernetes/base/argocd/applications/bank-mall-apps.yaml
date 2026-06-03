@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bank-mall-apps
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/qieqiuyue/bank-mall-platform.git
+    targetRevision: main
+    path: infra/kubernetes/base
+    directory:
+      recurse: true
+      exclude: |
+        {argocd/,jaeger/,monitoring/,ingress/,security/,namespace.yaml,configmap.yaml,secret.yaml,hpa/}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bank-mall
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=false
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bank-mall-monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/qieqiuyue/bank-mall-platform.git
+    targetRevision: main
+    path: infra/kubernetes/base/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bank-mall-infra
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/qieqiuyue/bank-mall-platform.git
+    targetRevision: main
+    path: infra/kubernetes/base
+    directory:
+      include: |
+        {ingress/,security/,namespace.yaml,configmap.yaml,secret.yaml,hpa/}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bank-mall
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

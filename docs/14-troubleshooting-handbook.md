@@ -542,3 +542,109 @@ done
 # 查询 bank-mall 日志
 curl -s "http://10.0.0.41:30310/loki/api/v1/label/namespace/values" | python3 -m json.tool
 ```
+
+---
+
+## 六、S2 NetworkPolicy 排查（2026-06-04）
+
+### 6.1 NetworkPolicy namespaceSelector 静默失效
+
+**症状**：跨 namespace Pod 间通信超时（payment → jaeger:16686），同 namespace 内正常，Pod IP 直连也超时。
+
+**排查路径**（5 层弯路）：
+1. 怀疑 Calico IPIP 跨节点 → Jaeger 迁同节点仍超时，排除
+2. 怀疑多 egress policy 聚合 → 合并为单一 policy 仍超时，排除
+3. 怀疑 kube-proxy Service 路由 → Jaeger 连自己 ClusterIP 也超时（干扰信号，因 ingress 策略阻回环流量）
+4. 怀疑 egress deny-all → 删除后仍超时，排除
+5. 删除 jaeger ns 全部 ingress 策略 → ❌ 通了！apply 回去又不通
+
+**根因**：jaeger ns 的 ingress NetworkPolicy 用 `namespaceSelector: {matchLabels: {name: bank-mall}}`，但 `bank-mall` namespace **缺少自定义 label `name: bank-mall`**。K8s 自动添加的 `kubernetes.io/metadata.name` 不会匹配 `matchLabels` 中的 `name` key。
+
+**验证方法**：
+```bash
+kubectl get ns bank-mall --show-labels
+# 如果没有 "name=bank-mall" → NetworkPolicy 的 namespaceSelector 永远不匹配
+```
+
+**修复**：
+```bash
+kubectl label ns bank-mall name=bank-mall
+# 同步到 Git: infra/kubernetes/base/namespace.yaml 的 labels 下加 name: bank-mall
+```
+
+**教训**：用 `namespaceSelector.matchLabels` 匹配跨 namespace 流量时，确保目标 ns 确实有这个 label。这看起来像常识，但它是 NetworkPolicy 静默失效最常见的原因。
+
+---
+
+### 6.2 Jaeger `runAsNonRoot` 导致 CrashLoopBackOff
+
+**症状**：Jaeger Pod 加了 `runAsNonRoot: true` + `runAsUser: 1000` 后 CrashLoopBackOff。
+
+**日志**：`open /badger/key/MANIFEST: permission denied`
+
+**根因**：PVC 中的 Badger 数据文件由之前以 root 运行的 Jaeger Pod 创建。切换 UID 1000 后无权读取已有文件。Jaeger 是 Go 二进制，内部以 root 启动，不支持非 root 运行。
+
+**修复**：撤掉 pod 级 `runAsNonRoot` + `runAsUser`，保留 `fsGroup: 1000`（PVC 组写入）和容器级 securityContext。
+
+---
+
+## 七、S2 OTEL & PSA 排查（2026-06-04）
+
+### 7.1 OTEL gRPC 超时
+
+**症状**：`Failed to export spans. java.io.InterruptedIOException: timeout`，目标端口 4317。
+
+**排查**：
+```bash
+kubectl exec -n jaeger deploy/jaeger -- ss -tlnp | grep 4317
+# :::4317 — 确认在监听
+kubectl logs -n jaeger deploy/jaeger --tail=30 | grep -i otlp
+# grpc resolver 只用 localhost:4317，不暴露对外地址
+```
+
+**根因**：Jaeger 1.60 all-in-one 的 gRPC server 在 `[::]:4317` 监听但内部只连 `localhost:4317`。OTEL agent 的 OkHttp gRPC 客户端在跨 Pod 场景协议协商失败。
+
+**修复**：切到 `http/protobuf` 协议 + 端口 4318：
+```bash
+kubectl set env deployment/payment-service -n bank-mall \
+  OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
+  OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger-collector.jaeger.svc.cluster.local:4318
+```
+
+### 7.2 PSA restricted warning（otel-agent-init 缺 securityContext）
+
+**症状**：
+```
+Warning: would violate PodSecurity "restricted:latest": allowPrivilegeEscalation != false
+(containers "otel-agent-init", "payment-service" must set securityContext.allowPrivilegeEscalation=false)
+```
+
+**根因**：S2 的 OTEL initContainer 定义中缺少容器级 securityContext。PSA `restricted`（enforce=baseline）为 warn 模式不阻断，但面试时会被追问。
+
+**修复**：给 4 个 deployment 的主容器和 otel-agent-init 都加：
+```yaml
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+```
+
+### 7.3 Liveness probe 120s 不足（OTEL agent 拖慢启动）
+
+**症状**：新 Pod 反复 `liveness probe failed` 重启。
+
+**根因**：OTEL agent 加载增加约 20-30 秒启动时间，慢节点（worker01）上总启动时间超 120 秒。
+
+**修复**：`livenessProbe.initialDelaySeconds: 120 → 180`。
+
+### 7.4 SSH heredoc 在终端中破坏 YAML 缩进
+
+**症状**：`cat <<'EOF' | kubectl apply -f -` 总是报 `mapping values are not allowed`。
+
+**根因**：SSH 终端处理多行粘贴时换行符不规范，导致 YAML 缩进错位。
+
+**替代方案**（按优先级）：
+1. 把文件推到 GitHub → `git pull` → `kubectl apply -f <path>`（首选）
+2. 单行 `echo '...' > /tmp/file.yaml` → `kubectl apply -f /tmp/file.yaml`
+3. `kubectl create` 代替复杂 YAML（简单资源时）

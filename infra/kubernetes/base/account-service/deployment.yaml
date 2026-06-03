@@ -19,10 +19,13 @@ spec:
         app.kubernetes.io/part-of: bank-mall
         app.kubernetes.io/component: account
       annotations:
-        prometheus.io/scrape: "true"
+        prometheus.io/scrape: 'true'
         prometheus.io/path: /actuator/prometheus
-        prometheus.io/port: "8082"
+        prometheus.io/port: '8082'
     spec:
+      volumes:
+      - name: otel-agent
+        emptyDir: {}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -32,7 +35,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: account-service
-        image: 10.0.0.61/bank-mall/account-service:1.0.0
+        image: 10.0.0.61/bank-mall/account-service:2.0.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
@@ -44,14 +47,21 @@ spec:
             name: bank-mall-secret
         env:
         - name: SERVER_PORT
-          value: "8082"
+          value: '8082'
         - name: SPRING_APPLICATION_NAME
-          value: "account-service"
+          value: account-service
+        - name: JAVA_TOOL_OPTIONS
+          value: -javaagent:/otel/opentelemetry-javaagent.jar
+        - name: OTEL_SERVICE_NAME
+          value: account-service
+        volumeMounts:
+        - name: otel-agent
+          mountPath: /otel
         livenessProbe:
           httpGet:
             path: /api/accounts/health
             port: 8082
-          initialDelaySeconds: 30
+          initialDelaySeconds: 180
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
@@ -65,11 +75,27 @@ spec:
           failureThreshold: 3
         resources:
           requests:
-            cpu: "100m"
-            memory: "256Mi"
+            cpu: 100m
+            memory: 256Mi
           limits:
-            cpu: "500m"
-            memory: "512Mi"
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      initContainers:
+      - name: otel-agent-init
+        image: 10.0.0.61/bank-mall/otel-agent-init:latest
+        command:
+        - sh
+        - -c
+        - cp /otel/opentelemetry-javaagent.jar /mnt/otel/
+        volumeMounts:
+        - name: otel-agent
+          mountPath: /mnt/otel
+        imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

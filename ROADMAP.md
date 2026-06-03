@@ -1,93 +1,106 @@
 # ROADMAP
 
-> 按 `docs/execution-plan.md` 中定义的 6 阶段计划增量交付。
-> ✅ = 已完成 / 🔵 = 进行中 / ⚪ = 规划中
+> Delivered incrementally following the 6-phase execution plan defined in [`docs/execution-plan.md`](docs/execution-plan.md).
+> ✅ = Done / 🔵 = In Progress / ⚪ = Planned
 
 ---
 
-## V1 — 当前版本
+## V1 — Current Release
 
-### S0：平台抢救与验证 🔵 进行中
+### S0：Platform Recovery & Baseline Verification ✅
 
-- [x] 项目脚手架：README、.gitignore、.dockerignore、Makefile、ROADMAP、CONTRIBUTING
-- [ ] K8s 集群恢复与健康检查
-- [ ] Spring Boot 3.2 升级验证
-- [ ] 网络连通性验证
-- [ ] Harbor 镜像仓库恢复
-- [ ] `scripts/preflight.sh`
-- [ ] `.github/workflows/ci.yml`
+- [x] Project scaffold：README, .gitignore, .dockerignore, Makefile, ROADMAP, CONTRIBUTING
+- [x] K8s cluster recovery and health check
+- [x] Spring Boot 4.0.6 + RestClient compile verification
+- [x] Network connectivity verification (GitHub, ghcr.io alternatives)
+- [x] Harbor registry recovery
+- [x] `scripts/preflight.sh`
+- [x] `.github/workflows/ci.yml`
 
-### S1：业务最小闭环 ⚪ 规划中
+### S1：Business Closure ✅
 
-- [ ] auth-service JWT + BCrypt
-- [ ] account-service JPA + Flyway + 交易流水
-- [ ] payment-service RestClient + 补偿逻辑
-- [ ] notification-service 通知记录
-- [ ] 统一 ApiResponse + 全局异常处理
-- [ ] MySQL 4 库初始化
-- [ ] build-images.sh / deploy.sh / smoke-test.sh
+- [x] auth-service — BCrypt password hashing + JWT stateless tokens
+- [x] account-service — JPA entities + Flyway migrations + optimistic locking + idempotency keys
+- [x] payment-service — RestClient cross-service calls + compensation logic with manual retry
+- [x] notification-service — notification persistence
+- [x] Unified ApiResponse + global exception handling
+- [x] MySQL 4 databases bootstrap
+- [x] `scripts/build-images.sh` / `deploy.sh` / `smoke-test.sh`
+- [x] 41 unit tests across 4 services
 
-### S2：平台能力矩阵 ⚪ 规划中
+### S2：Platform Capability Matrix ✅
 
-- [ ] ArgoCD + auto-sync + selfHeal
-- [ ] Jaeger all-in-one + Badger + PVC
-- [ ] Prometheus + Grafana 仪表盘 + 告警
-- [ ] Loki + Promtail 日志聚合
-- [ ] Sealed Secrets
-- [ ] NetworkPolicy + PodSecurity
-- [ ] HPA
+- [x] ArgoCD — 3 Application CRs with auto-sync, prune, and self-heal
+- [x] Jaeger all-in-one 1.60 — Badger storage, PVC, Recreate strategy
+- [x] OpenTelemetry Java Agent — initContainer injection (hostPath→GitHub→Harbor, 3 iterations)
+- [x] Prometheus + Micrometer custom metrics — QPS, success rate, P99 latency
+- [x] Grafana dashboards — business overview + SLI/SLO panels + 3 alert rules
+- [x] Loki + Promtail — log aggregation with structured metadata
+- [x] Sealed Secrets — all 8 credentials encrypted, zero plaintext in Git
+- [x] NetworkPolicy — deny-all baseline + whitelist for DNS, ingress, monitoring, MySQL, cross-service, Jaeger
+- [x] PodSecurity — baseline enforced, restricted audit
+- [x] PDB ×4, LimitRange, ResourceQuota
+- [x] Dockerfile — multi-stage builds, non-root user, HEALTHCHECK (all 4 services)
+- [x] Maven parent POM — unified dependency management (SB 4.0.6, JDK 21, jjwt 0.12.6)
+- [x] `.dockerignore` — 55-line exclusion rules
 
-### S3：双平台 CI/CD ⚪ 规划中
+### S3：Dual-Platform CI/CD 🔵 Next
 
-- [ ] GitHub Actions：Gitleaks + Semgrep + mvn test + Trivy
-- [ ] `scripts/ci.sh` 内网一键交付
-- [ ] 飞书 Bot 通知
+- [ ] Semgrep SAST rules and CI gate
+- [ ] Gitleaks pre-commit hook and CI gate
+- [ ] Trivy image scanning (hard gate: HIGH/CRITICAL blocked)
+- [ ] GitHub Actions full pipeline (lint → test → build → scan → notify)
+- [ ] `scripts/ci.sh` internal delivery automation
+- [ ] Feishu bot CI/CD notifications
+- [ ] Gitleaks block case study (intentional secret → blocked → fix → re-commit)
 
-### S4：故障演练与压测 ⚪ 规划中
+### S4：Chaos Engineering & Load Testing ⚪ Planned
 
-- [ ] 故障 1：OOMKilled
-- [ ] 故障 2：NetworkPolicy 误配
-- [ ] 故障 3：Jaeger 慢调用定位
-- [ ] JMeter 压测报告
-- [ ] 3 份复盘文档
+- [ ] Scenario 1: OOMKilled — account-service memory exhaustion
+- [ ] Scenario 2: NetworkPolicy misconfiguration
+- [ ] Scenario 3: Jaeger slow-call root cause analysis
+- [ ] JMeter load test — 50/100/200 concurrent users
+- [ ] 3 postmortem documents
 
-### S5：润色与包装 ⚪ 规划中
+### S5：Polish & Packaging ⚪ Planned
 
-- [ ] Swagger/OpenAPI
-- [ ] Helm Charts（dev/staging/prod）
-- [ ] 面试材料
+- [ ] Swagger/OpenAPI (springdoc-openapi v2)
+- [ ] Helm Charts (dev/staging/prod)
+- [ ] High-availability architecture design document
+- [ ] Redis idempotency design document
 
-### S6：缓冲加分 ⚪ 规划中
+### S6：Bonus (Time Permitting) ⚪ Planned
 
-- [ ] Velero 备份恢复演示
-- [ ] Argo Rollouts 灰度发布
-- [ ] Kyverno 自定义策略
-
----
-
-## V2 — 生产化规划
-
-| 能力 | 说明 |
-|------|------|
-| 多 master HA | keepalived + etcd 备份 |
-| Argo Rollouts | 金丝雀发布 |
-| Kyverno | 策略引擎 |
-| Velero | 定时备份 + 灾难恢复 |
-| Redis | 热点缓存、分布式锁 |
-
----
-
-## 明确排除
-
-| 排除项 | 理由 |
-|--------|------|
-| Spring Cloud Gateway | Ingress Nginx 已够，K8s Service + CoreDNS 就是服务发现 |
-| Redis 缓存 | 平台工程叙事不需要；设计文档有对比方案 |
-| 前端页面 | 定位为平台工程师/SRE |
-| 多 master HA | 实验集群无法重建；设计文档已覆盖 |
-| SonarQube | Semgrep 覆盖相同场景 |
-| Seata 分布式事务 | 补偿逻辑 + 日终对账更贴近真实支付系统 |
+- [ ] Velero backup and restore demonstration
+- [ ] Argo Rollouts canary deployment
+- [ ] Kyverno custom policies
+- [ ] Kubecost cost visualization
 
 ---
 
-**最后更新**：2026-06-02 | S0 初始化中
+## V2 — Productionization Roadmap
+
+| Capability | Description |
+|------------|-------------|
+| Multi-master HA | keepalived + VIP + etcd backup |
+| Argo Rollouts | Canary and blue-green deployment strategies |
+| Kyverno | Policy-as-code for compliance enforcement |
+| Velero | Scheduled backups + disaster recovery |
+| Redis | Hot data caching, distributed locking |
+
+---
+
+## Explicitly Excluded
+
+| Item | Rationale |
+|------|-----------|
+| Spring Cloud Gateway | Ingress Nginx handles routing for 4 services; K8s Service + CoreDNS replaces service discovery |
+| Redis (current release) | Platform engineering narrative does not require a cache layer; design doc compares DB UNIQUE vs Redis SETNX |
+| Frontend UI | Project scope is platform engineering / SRE, not full-stack |
+| Multi-master HA (current cluster) | Experimental 1-node control plane; HA topology documented in architecture design |
+| SonarQube | Semgrep covers the same SAST use case with zero deployment overhead |
+| Seata distributed transactions | Compensation logic + daily reconciliation more closely model real payment systems |
+
+---
+
+**Last updated**: 2026-06-04 | S2 Complete, S3 Next

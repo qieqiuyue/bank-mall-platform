@@ -1,8 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: bank-mall
+  name: argocd
   labels:
-    name: bank-mall
+    name: argocd
     app.kubernetes.io/part-of: bank-mall
-    app.kubernetes.io/managed-by: kubectl

@@ -26,6 +26,7 @@ class AccountServiceTest {
 
     @Mock AccountRepository accountRepo;
     @Mock TransactionRepository txnRepo;
+    @Mock com.bank.account.metrics.AccountMetrics metrics;
     @InjectMocks AccountService accountService;
 
     private Account account;

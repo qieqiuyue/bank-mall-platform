@@ -334,14 +334,62 @@ docs/interview/
 
 ## 八、下阶段待决策事项
 
-| 事项 | 候选方案 | 待确认点 |
-|------|----------|----------|
-| Ingress Controller | Nginx Ingress / Traefik | 是否需要 TLS termination |
-| HPA 指标源 | CPU / 自定义业务指标 | 是否接入 Prometheus Adapter |
-| 监控栈 | Prometheus + Grafana / kube-prometheus-stack | 是否使用 Helm 部署 |
-| 日志方案 | Loki + Promtail / EFK | 学习成本和资源占用 |
-| V2 数据存储 | MySQL in K8s / 外部 MySQL | 是否需要 StatefulSet + PV |
-| Gateway | Spring Cloud Gateway / Nginx | 是否与 Ingress 重复 |
+| 事项 | 候选方案 | 状态 |
+|------|----------|:---:|
+| Ingress Controller | Nginx Ingress（已选） | ✅ 已决策 |
+| HPA 指标源 | CPU（已选）+ 业务指标（Micrometer 已接入） | ✅ 已决策 |
+| 监控栈 | Prometheus + Grafana（已部署） | ✅ 已决策 |
+| 日志方案 | Loki + Promtail（已部署） | ✅ 已决策 |
+| V2 数据存储 | MySQL in K8s（当前方案），生产建议外部 | ⚠️ 待评估 |
+| Gateway | Ingress Nginx（4 服务不需要额外 Gateway） | ✅ 已决策 |
+| 链路追踪 | Jaeger all-in-one + OTEL Java Agent（2026-06-04 上线） | ✅ 已决策 |
+| Secret 管理 | Sealed Secrets（2026-06-04 上线） | ✅ 已决策 |
+| Redis | 设计文档已写，当前不实现 | 🔵 V2 规划 |
+
+---
+
+## 九、S2 关键决策：OTEL Agent 注入方式（2026-06-04）
+
+### 背景
+
+4 个 Java 微服务需要向 Jaeger 上报 trace，OpenTelemetry Java Agent 是最佳方案（JVM `-javaagent` 参数注入，零代码侵入）。
+
+### 三个候选方案及其迭代
+
+| 版本 | 方案 | 实现 | 问题 |
+|:---:|------|------|------|
+| V1 | hostPath | Deployment 挂载 `/opt/otel/opentelemetry-javaagent.jar` | PSA `baseline` 标签不允许 hostPath 挂载，Pod 无法启动 |
+| V2 | initContainer 从 GitHub 下载 | initContainer `wget` 下载 jar 到 emptyDir | VM 网络 `objects.githubusercontent.com` 被 GFW 阻断，curl 超时 |
+| V3 | Harbor 镜像中转 | initContainer 镜像打包 agent jar，`cp` 到 emptyDir，主容器 `-javaagent` 加载 | ✅ 无 hostPath 依赖、无外网依赖、PSA 合规 |
+
+### 最终方案
+
+```
+initContainers:
+- name: otel-agent-init
+  image: 10.0.0.61/bank-mall/otel-agent-init:latest
+  command: [sh, -c, cp /otel/opentelemetry-javaagent.jar /mnt/otel/]
+
+containers:
+- name: payment-service
+  env:
+  - name: JAVA_TOOL_OPTIONS
+    value: -javaagent:/otel/opentelemetry-javaagent.jar
+  - name: OTEL_SERVICE_NAME
+    value: payment-service
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    valueFrom: configMapKeyRef  # jaeger-collector.jaeger:4317
+```
+
+### 面试话术
+
+> “OTEL agent 注入经历了三次迭代。第一版 hostPath 被 PodSecurity 阻断；第二版 initContainer 从 GitHub 下载被网络墙阻断；最终版把 agent jar 打进 Harbor 镜像，initContainer 从内网 Harbor 拉取后拷贝到 emptyDir。三种约束——安全策略、网络策略、零代码侵入——全部满足。这个过程本身就是平台工程能力的体现。”
+
+### 教训
+
+- K8s PodSecurity `restricted` 不允许 hostPath。initContainer + emptyDir 是生产合规方案。
+- initContainer 不适合运行时下载（网络不稳定、增加启动延迟）。Harbor 中转是内网环境的正确做法。
+- OTEL agent 以 gRPC 协议发送到 Jaeger 可能遇到兼容性问题。当前使用 http/protobuf + 端口 4318。
 
 ---
 

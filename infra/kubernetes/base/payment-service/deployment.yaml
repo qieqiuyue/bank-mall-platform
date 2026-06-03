@@ -19,10 +19,13 @@ spec:
         app.kubernetes.io/part-of: bank-mall
         app.kubernetes.io/component: payment
       annotations:
-        prometheus.io/scrape: "true"
+        prometheus.io/scrape: 'true'
         prometheus.io/path: /actuator/prometheus
-        prometheus.io/port: "8083"
+        prometheus.io/port: '8083'
     spec:
+      volumes:
+      - name: otel-agent
+        emptyDir: {}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -44,14 +47,21 @@ spec:
             name: bank-mall-secret
         env:
         - name: SERVER_PORT
-          value: "8083"
+          value: '8083'
         - name: SPRING_APPLICATION_NAME
-          value: "payment-service"
+          value: payment-service
+        - name: JAVA_TOOL_OPTIONS
+          value: -javaagent:/otel/opentelemetry-javaagent.jar
+        - name: OTEL_SERVICE_NAME
+          value: payment-service
+        volumeMounts:
+        - name: otel-agent
+          mountPath: /otel
         livenessProbe:
           httpGet:
             path: /api/payments/health
             port: 8083
-          initialDelaySeconds: 120
+          initialDelaySeconds: 180
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
@@ -65,11 +75,27 @@ spec:
           failureThreshold: 3
         resources:
           requests:
-            cpu: "100m"
-            memory: "256Mi"
+            cpu: 100m
+            memory: 256Mi
           limits:
-            cpu: "500m"
-            memory: "512Mi"
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      initContainers:
+      - name: otel-agent-init
+        image: 10.0.0.61/bank-mall/otel-agent-init:latest
+        command:
+        - sh
+        - -c
+        - cp /otel/opentelemetry-javaagent.jar /mnt/otel/
+        volumeMounts:
+        - name: otel-agent
+          mountPath: /mnt/otel
+        imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

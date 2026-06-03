@@ -246,8 +246,6 @@ S0-S1 期间使用 `feat/s0-cluster-verification` 承载所有前期工作。
 3. WSL2：`git checkout -b feat/notification-service`（CP3 开发）
 4. VM：`git checkout main && git pull origin main`（永远拉 main 部署）
 
----
-
 ## S1 CP3：notification-service 新写 + 全链路验证 + S1 完结
 
 **日期**：2026-06-03 凌晨  
@@ -319,3 +317,7 @@ notification: 支付通知落库 ✅  写入即完成 ✅
 1. `feat/s0-cluster-verification`（S0+CP1+CP2）→ PR → main（已合并）
 2. `feat/notification-service`（CP3）→ PR → main（待合并）
 3. VM harbor01/master01 使用 `feat/notification-service`，后续统一切 main
+
+---
+
+## S2 Day 1：Jaeger + ArgoCD + Sealed Secrets + 安全加固

@@ -30,8 +30,9 @@ class AuthControllerTest {
         userRepository = mock(UserRepository.class);
         passwordEncoder = mock(BCryptPasswordEncoder.class);
         jwtUtil = mock(JwtUtil.class);
+        com.bank.auth.metrics.AuthMetrics metrics = mock(com.bank.auth.metrics.AuthMetrics.class);
         mvc = MockMvcBuilders.standaloneSetup(
-                new AuthController(userRepository, passwordEncoder, jwtUtil)).build();
+                new AuthController(userRepository, passwordEncoder, jwtUtil, metrics)).build();
     }
 
     @Test

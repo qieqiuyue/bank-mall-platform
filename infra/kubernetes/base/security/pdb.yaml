@@ -1,0 +1,45 @@
+# PodDisruptionBudget — 保证节点维护时至少保留 1 个副本
+# 注意：minAvailable=1 与 HPA minReplicas=1 不冲突
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: auth-service-pdb
+  namespace: bank-mall
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: auth-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: account-service-pdb
+  namespace: bank-mall
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: account-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-service-pdb
+  namespace: bank-mall
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: payment-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notification-service-pdb
+  namespace: bank-mall
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: notification-service

@@ -29,9 +29,13 @@ public class AccountService {
     private final AccountRepository accountRepo;
     private final TransactionRepository txnRepo;
 
-    public AccountService(AccountRepository accountRepo, TransactionRepository txnRepo) {
+    private final com.bank.account.metrics.AccountMetrics metrics;
+
+    public AccountService(AccountRepository accountRepo, TransactionRepository txnRepo,
+                          com.bank.account.metrics.AccountMetrics metrics) {
         this.accountRepo = accountRepo;
         this.txnRepo = txnRepo;
+        this.metrics = metrics;
     }
 
     public AccountResponse getAccount(String accountNo) {
@@ -52,13 +56,17 @@ public class AccountService {
     public TransactionResponse debit(String accountNo, DebitRequest req) {
         validateAmount(req.getAmount());
         checkIdempotency(req.getIdempotencyKey());
-        return withRetry(() -> doDebit(accountNo, req));
+        TransactionResponse resp = withRetry(() -> doDebit(accountNo, req));
+        metrics.recordDebit();
+        return resp;
     }
 
     public TransactionResponse credit(String accountNo, CreditRequest req) {
         validateAmount(req.getAmount());
         checkIdempotency(req.getIdempotencyKey());
-        return withRetry(() -> doCredit(accountNo, req));
+        TransactionResponse resp = withRetry(() -> doCredit(accountNo, req));
+        metrics.recordCredit();
+        return resp;
     }
 
     public TransactionResponse reverse(String accountNo, ReverseRequest req) {
@@ -80,15 +88,18 @@ public class AccountService {
         // Reverse the original transaction: debit→credit, credit→debit
         // Uses REVERSAL type so the transaction is correctly marked
         BigDecimal reverseAmount = original.getAmount();
+        TransactionResponse resp;
         if (original.getType() == TransactionType.DEBIT) {
-            return withRetry(() ->
+            resp = withRetry(() ->
                     doCreditWithType(accountNo, toCreditForReverse(reverseAmount, original, req),
                             TransactionType.REVERSAL));
         } else {
-            return withRetry(() ->
+            resp = withRetry(() ->
                     doDebitWithType(accountNo, toDebitForReverse(reverseAmount, original, req),
                             TransactionType.REVERSAL));
         }
+        metrics.recordReverse();
+        return resp;
     }
 
     // --- Internal operations ---

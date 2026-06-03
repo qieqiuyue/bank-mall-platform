@@ -1,0 +1,30 @@
+{
+  "title": "Bank Mall - SLI/SLO",
+  "uid": "bank-mall-sli-slo",
+  "panels": [
+    {
+      "title": "Availability SLI (SLO >99.5%)",
+      "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{status=~\"2..\"}[5m])) / sum(rate(http_server_requests_seconds_count[5m])) * 100"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 99.5, "color": "red"}, {"value": 99.9, "color": "green"}]}}},
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+    },
+    {
+      "title": "P99 Latency — Payment API (SLO <500ms)",
+      "targets": [{"expr": "histogram_quantile(0.99, rate(http_server_requests_seconds_bucket{uri=~\"/api/payments\"}[5m])) * 1000"}],
+      "fieldConfig": {"defaults": {"unit": "ms", "thresholds": {"steps": [{"value": 500, "color": "green"}, {"value": 1000, "color": "red"}]}}},
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+    },
+    {
+      "title": "Error Rate (SLO <0.1%)",
+      "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count[5m])) * 100"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 0.1, "color": "green"}, {"value": 1.0, "color": "red"}]}}},
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}
+    },
+    {
+      "title": "Payment Success Rate (SLO >99.9%)",
+      "targets": [{"expr": "sum(rate(payment_requests_total{status=\"COMPLETED\"}[5m])) / sum(rate(payment_requests_total[5m])) * 100"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 99.9, "color": "green"}]}}},
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}
+    }
+  ]
+}

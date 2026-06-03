@@ -21,5 +21,6 @@ data:
   DB_NAME_ACCOUNT: "bank_account"
   DB_NAME_PAYMENT: "bank_payment"
   DB_NAME_NOTIFICATION: "bank_notification"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger-collector.jaeger.svc.cluster.local:4318"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger-collector.jaeger.svc.cluster.local:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
   OTEL_TRACES_EXPORTER: "otlp"

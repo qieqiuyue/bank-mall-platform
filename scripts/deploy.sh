@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-K8S_BASE="${SCRIPT_DIR}/../k8s/base"
+K8S_BASE="${SCRIPT_DIR}/../infra/kubernetes/base"
 
 echo "=== Deploying bank-mall to Kubernetes ==="
 

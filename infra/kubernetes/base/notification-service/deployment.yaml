@@ -23,6 +23,10 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8084"
     spec:
+      volumes:
+      - name: otel-agent
+        emptyDir: {}
+
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -30,6 +34,14 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+      - name: otel-agent-download
+        image: alpine:latest
+        command: ["sh","-c","wget -q -O /otel/opentelemetry-javaagent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar"]
+        volumeMounts:
+        - name: otel-agent
+          mountPath: /otel
+
       containers:
       - name: notification-service
         image: 10.0.0.61/bank-mall/notification-service:2.0.0
@@ -47,6 +59,13 @@ spec:
           value: "8084"
         - name: SPRING_APPLICATION_NAME
           value: "notification-service"
+        - name: JAVA_TOOL_OPTIONS
+          value: "-javaagent:/otel/opentelemetry-javaagent.jar"
+        - name: OTEL_SERVICE_NAME
+          value: "notification-service"
+        volumeMounts:
+        - name: otel-agent
+          mountPath: /otel
         livenessProbe:
           httpGet:
             path: /api/notifications/health

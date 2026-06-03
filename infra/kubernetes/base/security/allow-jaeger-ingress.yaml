@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-from-monitoring
+  name: allow-from-bank-mall-and-monitoring
   namespace: jaeger
 spec:
   podSelector:
@@ -26,3 +26,5 @@ spec:
       port: 4317
     - protocol: TCP
       port: 4318
+    - protocol: TCP
+      port: 16686

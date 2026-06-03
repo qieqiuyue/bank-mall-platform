@@ -1,0 +1,43 @@
+{
+  "title": "Bank Mall - Business Overview",
+  "uid": "bank-mall-business",
+  "panels": [
+    {
+      "title": "Payment QPS",
+      "targets": [{"expr": "rate(payment_requests_total[1m])"}],
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 6}
+    },
+    {
+      "title": "Payment Success Rate",
+      "targets": [{"expr": "sum(rate(payment_requests_total{status=\"COMPLETED\"}[5m])) / sum(rate(payment_requests_total[5m])) * 100"}],
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 6}
+    },
+    {
+      "title": "Payment P99 Latency",
+      "targets": [{"expr": "histogram_quantile(0.99, rate(payment_duration_seconds_bucket[5m]))"}],
+      "gridPos": {"x": 0, "y": 6, "w": 8, "h": 6}
+    },
+    {
+      "title": "Account Operations / min",
+      "targets": [
+        {"expr": "rate(account_debit_total[1m])", "legendFormat": "debit"},
+        {"expr": "rate(account_credit_total[1m])", "legendFormat": "credit"},
+        {"expr": "rate(account_reverse_total[1m])", "legendFormat": "reverse"}
+      ],
+      "gridPos": {"x": 8, "y": 6, "w": 8, "h": 6}
+    },
+    {
+      "title": "Login Attempts / min",
+      "targets": [
+        {"expr": "rate(login_attempts_total{status=\"SUCCESS\"}[1m])", "legendFormat": "success"},
+        {"expr": "rate(login_attempts_total{status=\"FAILED\"}[1m])", "legendFormat": "failed"}
+      ],
+      "gridPos": {"x": 16, "y": 6, "w": 8, "h": 6}
+    },
+    {
+      "title": "Notifications Sent / min",
+      "targets": [{"expr": "rate(notifications_sent_total[1m])"}],
+      "gridPos": {"x": 0, "y": 12, "w": 8, "h": 6}
+    }
+  ]
+}

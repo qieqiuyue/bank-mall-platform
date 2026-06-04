@@ -14,16 +14,14 @@ images:
     newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-payment
   - name: 10.0.0.61/bank-mall/notification-service
     newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-notification
-  - name: mysql
-    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/mysql
-
 patches:
-  # Remove nodeName: k8s-worker01 — let ACK scheduler place pods
-  - path: patches/remove-nodename.yaml
-    target:
-      kind: Deployment
   # Ingress: NodePort → LoadBalancer (ACK auto-creates SLB)
   - path: patches/ingress-lb.yaml
     target:
       kind: Service
       name: ingress-nginx-controller
+  # MySQL: remove hardcoded nodeName (ACK scheduler picks the node)
+  - path: patches/remove-nodename.yaml
+    target:
+      kind: Deployment
+      name: mysql

@@ -648,3 +648,47 @@ securityContext:
 1. 把文件推到 GitHub → `git pull` → `kubectl apply -f <path>`（首选）
 2. 单行 `echo '...' > /tmp/file.yaml` → `kubectl apply -f /tmp/file.yaml`
 3. `kubectl create` 代替复杂 YAML（简单资源时）
+
+---
+
+## 八、PVC 重建与 PV Released 状态（2026-06-05 凌晨）
+
+### 症状
+
+Jaeger Pod 反复 CrashLoopBackOff。`kubectl describe pod` 显示：
+```
+Warning  FailedScheduling  0/3 nodes are available: persistentvolumeclaim "jaeger-badger-pvc" not found.
+```
+
+### 排查
+
+1. 删了 PVC `jaeger-badger-pvc` + Deployment，重建 apply jaeger YAML
+2. PVC 自动创建成功，但 PV 状态为 `Released`——旧的 PV 还绑着旧 PVC 的引用，不释放
+3. 新 PVC 无法绑定被占用的 PV → Pod Pending 无日志
+
+```bash
+kubectl get pv | grep jaeger
+# jaeger-badger-pv   5Gi   RWO   Retain   Released   jaeger/jaeger-badger-pvc   <unset>
+```
+
+### 根因
+
+K8s PV 的 `persistentVolumeReclaimPolicy: Retain` 策略在 PVC 删除后**不会自动释放 PV**。PV 状态变为 `Released` 但不接受新的 PVC 绑定，因为底层存储数据仍保留（管理员手动处理）。
+
+### 修复
+
+```bash
+# 1. 删掉 Released 状态的旧 PV
+kubectl delete pv jaeger-badger-pv
+
+# 2. 重建 PV（YAML apply）
+kubectl apply -f infra/kubernetes/base/jaeger/jaeger-pv.yaml
+
+# 3. 新 PV 自动绑定新 PVC → Pod 创建
+```
+
+### 教训
+
+- `Retain` 策略适合生产环境（防止误删数据），但实验环境推荐 **`Delete`**（PVC 删除时自动删 PV）
+- 重建 PVC 时先检查 PV 状态：`kubectl get pv | grep -E "Released|Failed"`
+- `hostPath` PV 删起来不丢数据，大胆 `kubectl delete pv`

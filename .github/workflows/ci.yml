@@ -91,12 +91,18 @@ jobs:
   # ── Job 5: Feishu notification ─────────────────────────────────
   notify:
     needs: [build-and-scan]
-    if: always()
+    if: always() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
     - name: Feishu webhook
+      env:
+        FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
       run: |
         STATUS="${{ needs.build-and-scan.result }}"
-        curl -X POST "${{ secrets.FEISHU_WEBHOOK }}" \
+        if [[ -z "${FEISHU_WEBHOOK}" ]]; then
+          echo "[INFO] FEISHU_WEBHOOK secret not configured — skipping notification"
+          exit 0
+        fi
+        curl -X POST "${FEISHU_WEBHOOK}" \
           -H "Content-Type: application/json" \
           -d "{\"msg_type\":\"text\",\"content\":{\"text\":\"Bank Mall CI/CD: ${STATUS}\"}}"

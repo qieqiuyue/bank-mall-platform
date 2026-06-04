@@ -320,4 +320,42 @@ notification: 支付通知落库 ✅  写入即完成 ✅
 
 ---
 
+## ACK 云上体验（2026-06-04）
+
+**时间**：~4h | **成本**：~¥15 | **结果**：5 服务 Running ✅
+
+### 踩坑记录
+
+1. **Kustomize 目录必须要有 kustomization.yaml**：overlay 引用的 base 目录如果没有 kustomization.yaml，Kustomize 报错"unable to find one of 'kustomization.yaml'"。修复：给 `infra/kubernetes/base/` 新建 kustomization.yaml，列出所有资源文件。
+
+2. **ACR 镜像命名不匹配**：harbor01 推镜像时加 `-service` 后缀（push 命令是什么名字就存什么名字），Kustomize `images` 没加后缀。错误：`crpi-czgg1...qqy_my_re/bank-mall-auth:2.0.0: not found`。修复：Kustomize 里 newName 加上 `-service` 后缀。
+
+3. **ACK 需要 imagePullSecret**：ACK 节点没有 ACR 拉取凭证，`ErrImagePull`。修复：`kubectl create secret docker-registry` + `kubectl patch serviceaccount default` 挂载 imagePullSecrets。
+
+4. **Docker Hub 被墙**：`mysql:8.0` 从 Docker Hub 拉不到。修复：harbor01 上 `docker pull mysql:8.0` + `docker tag` + `docker push ACR`，ACK 上 `kubectl set image` 指向 ACR。
+
+5. **JAVA_TOOL_OPTIONS 残留**：cloud overlay 用 Kustomize patch 移除了 initContainer，但 `JAVA_TOOL_OPTIONS: -javaagent:/otel/...` 还指向不存在的 JAR。JVM 启动失败 `Error opening zip file`。修复：4 个 base deployment 的 `JAVA_TOOL_OPTIONS` 值设为 `""`（空）。
+
+6. **hostPath PVC 不兼容**：MySQL 用 `hostPath` PV，ACK 没有对应路径。修复：hotfix 改为 `emptyDir`，删除 PVC 和 PV。
+
+7. **ingress controller 镜像拉不到**：`registry.k8s.io/ingress-nginx/controller` 被 GFW 阻断，ingress pod 反复 Failed。临时方案：用 `kubectl port-forward` 绕过，curl 验证 `auth-service health: SUCCESS`。
+
+### 核心验证
+
+```bash
+kubectl port-forward -n bank-mall svc/auth-service 8081:8081 --address=0.0.0.0 &
+curl http://localhost:8081/api/auth/health
+# {"code":"SUCCESS","data":{"service":"auth-service","users":3,"status":"UP"}}
+```
+
+### 面试话术
+
+> "我在阿里云 ACK 上部署过这整套微服务——从镜像推 ACR、Kustomize overlay 适配云环境（hostPath→emptyDir、NodePort→LoadBalancer、镜像名映射、OTA 环境变量清理），踩过 7 个坑，全部记录在案。本地 kubeadm + 云上 ACK 两种部署方式都实际验证过。"
+
+### 清理
+
+ACK 控制台 → 删除集群 → 手动检查残留 SLB/安全组/快照 → 确认费用清零。
+
+---
+
 ## S2 Day 1：Jaeger + ArgoCD + Sealed Secrets + 安全加固

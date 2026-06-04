@@ -6,8 +6,8 @@
     <mirror>
       <id>aliyun</id>
       <mirrorOf>*</mirrorOf>
-      <name>Aliyun Maven</name>
-      <url>https://maven.aliyun.com/repository/public</url>
+      <name>Maven Central</name>
+      <url>https://repo.maven.apache.org/maven2</url>
     </mirror>
   </mirrors>
 </settings>

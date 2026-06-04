@@ -19,7 +19,7 @@
 | # | 项 | 文件 | 修复方式 | 阶段 |
 |---|------|------|------|:---:|
 | 4 | Mockito JDK 21 警告 | `apps/*/pom.xml` | 4 个服务 pom.xml 加 `maven-surefire-plugin` 的 `-XX:+EnableDynamicAgentLoading` | S5 |
-| 5 | Q6 优先级标注矛盾 | `.opencode/plans/S3-cicd-implementation-plan.md` | 正文 P0 / 汇总表 P1 → 统一为 P0 | S3 |
+| 5 | Q6 优先级标注矛盾 | `.opencode/plans/S3-cicd-implementation-plan.md` | 正文 P0 / 汇总表 P1 → 统一为 P0 | ✅ |
 | 6 | 面试话术缺 CI/CD 体系化 Q&A | `docs/interview/` | 补 3-4 个 CI/CD 面试问题 | S5 |
 | 7 | 面试话术未区分岗位类型 | `docs/interview/` | 区分通用后端 vs DevOps/SRE 回答口径 | S5 |
 

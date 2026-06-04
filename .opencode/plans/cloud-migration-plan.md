@@ -105,7 +105,7 @@
 # - 地域：华东1（杭州）
 # - Worker 节点：2 × ECS c6.large（2C4G）
 # - CNI：Flannel（Q1 要求，避免 Terway NetworkPolicy 兼容问题）
-# - Kubernetes 版本：v1.30（与本地一致）
+# - Kubernetes 版本：v1.36.1（与本地一致）
 # - 网络插件：Flannel
 # - RAM Role：AliyunCSManagedNetworkRole（Q2 要求）
 

@@ -1,0 +1,56 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../base
+
+# Override OTEL config for cloud (ACK has no Jaeger)
+configMapGenerator:
+  - name: bank-mall-config
+    namespace: bank-mall
+    behavior: merge
+    literals:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=""
+      - OTEL_EXPORTER_OTLP_PROTOCOL=""
+      - OTEL_TRACES_EXPORTER="none"
+
+# Image registry override: Harbor (10.0.0.61) → ACR (Guangzhou personal instance)
+images:
+  - name: 10.0.0.61/bank-mall/auth-service
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-auth-service
+  - name: 10.0.0.61/bank-mall/account-service
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-account-service
+  - name: 10.0.0.61/bank-mall/payment-service
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-payment-service
+  - name: 10.0.0.61/bank-mall/notification-service
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-notification-service
+  - name: 10.0.0.61/bank-mall/otel-agent-init
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-otel-agent-init
+patches:
+  # Ingress: NodePort → LoadBalancer (ACK auto-creates SLB)
+  - path: patches/ingress-lb.yaml
+    target:
+      kind: Service
+      name: ingress-nginx-controller
+  # MySQL: remove hardcoded nodeName (ACK scheduler picks the node)
+  - path: patches/remove-nodename.yaml
+    target:
+      kind: Deployment
+      name: mysql
+  # Remove OTEL initContainer from 4 services (ACK has no Jaeger)
+  - path: patches/remove-otel.yaml
+    target:
+      kind: Deployment
+      name: auth-service
+  - path: patches/remove-otel.yaml
+    target:
+      kind: Deployment
+      name: account-service
+  - path: patches/remove-otel.yaml
+    target:
+      kind: Deployment
+      name: payment-service
+  - path: patches/remove-otel.yaml
+    target:
+      kind: Deployment
+      name: notification-service

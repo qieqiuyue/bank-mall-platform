@@ -4,6 +4,16 @@ kind: Kustomization
 resources:
   - ../base
 
+# Override OTEL config for cloud (ACK has no Jaeger)
+configMapGenerator:
+  - name: bank-mall-config
+    namespace: bank-mall
+    behavior: merge
+    literals:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=""
+      - OTEL_EXPORTER_OTLP_PROTOCOL=""
+      - OTEL_TRACES_EXPORTER="none"
+
 # Image registry override: Harbor (10.0.0.61) → ACR (Guangzhou personal instance)
 images:
   - name: 10.0.0.61/bank-mall/auth-service

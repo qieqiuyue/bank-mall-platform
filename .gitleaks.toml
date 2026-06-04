@@ -1,0 +1,21 @@
+title = "Bank Mall Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist — exclude docs, config files, and SealedSecret encrypted data"
+paths = [
+  '''docs/.*''',
+  '''\.gitleaks\.toml''',
+  '''sealed-.*\.yaml''',
+  '''.*\.md''',
+  '''\.semgrep\.yml''',
+  '''\.pre-commit-config\.yaml''',
+]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]?([a-z0-9]{32,})['"]?'''
+tags = ["key", "API"]

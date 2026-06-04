@@ -1,0 +1,4 @@
+rules:
+  - p/java-lang-security
+  - p/generic-secrets
+  - p/java-spring-security

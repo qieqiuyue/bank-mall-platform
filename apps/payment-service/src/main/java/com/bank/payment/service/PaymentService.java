@@ -101,9 +101,6 @@ public class PaymentService {
             log.info("Payment {} completed: {} debit, {} credit, amount={}",
                     payment.getPaymentNo(), req.getPayerAccount(), payeeAccount, req.getAmount());
 
-            // Step 3: Notify — non-blocking, failure does not roll back payment
-            notificationClient.send(req.getPayerAccount(), "PAYMENT_SUCCESS",
-                    "Payment of " + req.getAmount() + " " + payment.getCurrency() + " processed.");
         } catch (Exception e) {
             if (hasDebit) {
                 // Compensation: debit succeeded but credit failed → reverse the debit
@@ -125,6 +122,14 @@ public class PaymentService {
                 payment.setStatus("FAILED");
                 payment.setFailReason(e.getMessage());
             }
+        }
+
+        // Step 3: Notify — non-blocking, failure does not roll back payment
+        try {
+            notificationClient.send(req.getPayerAccount(), "PAYMENT_SUCCESS",
+                    "Payment of " + req.getAmount() + " " + payment.getCurrency() + " processed.");
+        } catch (Exception ex) {
+            log.warn("Notification failed for payment {}: {}", payment.getPaymentNo(), ex.getMessage());
         }
 
         paymentRepo.save(payment);

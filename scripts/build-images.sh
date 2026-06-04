@@ -25,7 +25,7 @@ for service in "${SERVICES[@]}"; do
 
   if [[ "${PUSH}" == "true" ]]; then
     echo "Pushing ${image}"
-    docker push --plain-http "${image}"
+    docker push "${image}"
   fi
 done
 

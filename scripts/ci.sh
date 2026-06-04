@@ -58,7 +58,7 @@ for service in "${SERVICES[@]}"; do
   echo "Building ${image}..."
   docker build -t "${image}" -f "${APPS_DIR}/${service}/Dockerfile" "${APPS_DIR}"
   echo "Pushing ${image}..."
-  docker push --plain-http "${image}"
+  docker push "${image}"
   log_pass "${image} pushed (plain-http)"
 done
 

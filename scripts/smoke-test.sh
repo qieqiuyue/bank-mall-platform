@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Minimal V1 smoke test: Ingress -> Service -> Pod -> Controller.
+# Smoke test: Ingress → Service → Pod → Controller (S2 full-chain).
 set -euo pipefail
 
 NODE_IP="${NODE_IP:-10.0.0.41}"
@@ -65,16 +65,17 @@ request() {
 require_command curl
 require_command jq
 
-log_section "Bank Mall V1 smoke test"
+IDEMPOTENCY_KEY="SMOKE-$(date +%s)"
+log_section "Bank Mall Smoke Test"
 echo "Base URL: ${BASE_URL}"
+echo "Idempotency Key: ${IDEMPOTENCY_KEY}"
 echo ""
 
 request "auth health" "GET" "/auth/api/auth/health"
 request "account balance" "GET" "/account/api/accounts/A1001/balance"
 request "payment create" "POST" "/payment/api/payments" \
-  '{"orderId":"ORDER-SMOKE-001","payerAccount":"A1001","amount":299.00,"currency":"CNY"}'
-request "notification send" "POST" "/notification/api/notifications" \
-  '{"channel":"SMS","receiver":"13800000000","template":"PAYMENT_SUCCESS"}'
+  "{\"payerAccount\":\"A1001\",\"amount\":10,\"currency\":\"CNY\",\"idempotencyKey\":\"${IDEMPOTENCY_KEY}\"}"
+request "notification list" "GET" "/notification/api/notifications?accountNo=A1001"
 
 echo ""
-log_pass "V1 minimal Ingress smoke test completed"
+log_pass "Smoke test completed"

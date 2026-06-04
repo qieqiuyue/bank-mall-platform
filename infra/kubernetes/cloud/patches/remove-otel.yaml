@@ -1,0 +1,4 @@
+# Remove OTEL agent initContainer from service deployments (cloud demo only)
+# ACK has no Jaeger — traces have nowhere to go
+- op: remove
+  path: /spec/template/spec/initContainers

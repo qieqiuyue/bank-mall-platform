@@ -1,0 +1,4 @@
+# NodePort → LoadBalancer — ACK auto-creates SLB with public IP
+- op: replace
+  path: /spec/type
+  value: LoadBalancer

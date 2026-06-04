@@ -21,7 +21,7 @@ for service in "${SERVICES[@]}"; do
   service_dir="${APPS_DIR}/${service}"
 
   echo "Building ${image}"
-  docker build -t "${image}" "${service_dir}"
+  docker build -t "${image}" -f "${service_dir}/Dockerfile" "${APPS_DIR}"
 
   if [[ "${PUSH}" == "true" ]]; then
     echo "Pushing ${image}"

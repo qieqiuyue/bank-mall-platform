@@ -56,7 +56,7 @@ log_section "Stage 3/6: Docker Build & Push"
 for service in "${SERVICES[@]}"; do
   image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
   echo "Building ${image}..."
-  docker build -t "${image}" "${APPS_DIR}/${service}"
+  docker build -t "${image}" -f "${APPS_DIR}/${service}/Dockerfile" "${APPS_DIR}"
   echo "Pushing ${image}..."
   docker push --plain-http "${image}"
   log_pass "${image} pushed (plain-http)"

@@ -26,6 +26,7 @@ images:
     newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-notification-service
   - name: 10.0.0.61/bank-mall/otel-agent-init
     newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-otel-agent-init
+
 patches:
   # Ingress: NodePort → LoadBalancer (ACK auto-creates SLB)
   - path: patches/ingress-lb.yaml
@@ -34,6 +35,11 @@ patches:
       name: ingress-nginx-controller
   # MySQL: remove hardcoded nodeName (ACK scheduler picks the node)
   - path: patches/remove-nodename.yaml
+    target:
+      kind: Deployment
+      name: mysql
+  # MySQL: hostPath → emptyDir (ACK has no hostPath; alicloud-disk would be production choice)
+  - path: patches/mysql-emptydir.yaml
     target:
       kind: Deployment
       name: mysql
@@ -51,6 +57,71 @@ patches:
       kind: Deployment
       name: payment-service
   - path: patches/remove-otel.yaml
+    target:
+      kind: Deployment
+      name: notification-service
+  # Disable OTEL javaagent for cloud (base has correct local value)
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: auth-service
+      spec:
+        template:
+          spec:
+            containers:
+            - name: auth-service
+              env:
+              - name: JAVA_TOOL_OPTIONS
+                value: ""
+    target:
+      kind: Deployment
+      name: auth-service
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: account-service
+      spec:
+        template:
+          spec:
+            containers:
+            - name: account-service
+              env:
+              - name: JAVA_TOOL_OPTIONS
+                value: ""
+    target:
+      kind: Deployment
+      name: account-service
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: payment-service
+      spec:
+        template:
+          spec:
+            containers:
+            - name: payment-service
+              env:
+              - name: JAVA_TOOL_OPTIONS
+                value: ""
+    target:
+      kind: Deployment
+      name: payment-service
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: notification-service
+      spec:
+        template:
+          spec:
+            containers:
+            - name: notification-service
+              env:
+              - name: JAVA_TOOL_OPTIONS
+                value: ""
     target:
       kind: Deployment
       name: notification-service

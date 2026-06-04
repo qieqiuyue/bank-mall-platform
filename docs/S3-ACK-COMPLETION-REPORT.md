@@ -86,16 +86,19 @@ ACK 托管版（华南3 广州）
 | 2 | ACR 镜像 not found | 推送叫 `*-service`，Kustomize 映射没有 | 加 `-service` 后缀 |
 | 3 | ACK 无 ACR 拉取凭证 | 节点没有 imagePullSecret | `docker-registry` secret + patch serviceaccount |
 | 4 | mysql:8.0 Docker Hub 被墙 | GFW 阻断 registry-1.docker.io | harbor01 拉 + tag + push ACR |
-| 5 | JAVA_TOOL_OPTIONS 残留 | cloud overlay 删了 initContainer 但 env 还在 | 4 个 base deployment 设空值（已恢复，加注释） |
+| 5 | JAVA_TOOL_OPTIONS 残留 | cloud overlay 删了 initContainer 但 env 还在 | cloud overlay inline patch 设空值；base 保持正确 javaagent 路径 |
 | 6 | MySQL hostPath PVC 不兼容 | ACK 无 VMware hostPath | hotfix：PVC→emptyDir |
-| 7 | ingress controller registry.k8s.io 被墙 | GFW 阻断 | port-forward 绕过（未解决） |
+| 7 | ingress controller registry.k8s.io 被墙 | GFW 阻断 `registry.k8s.io` | **待解决**：port-forward 验证了 5 服务健康，但公网 SLB 不通。ACK 应使用托管版 Ingress Controller（自带 SLB），而非自部署 nginx-ingress |
 
-### 已恢复的临时改动
+### ACK 临时改动的 GitOps 处理
 
-| 改动 | 状态 |
-|------|:---:|
-| JAVA_TOOL_OPTIONS 置空 | ✅ 已恢复，加 `# cloud: set to "" (no Jaeger)` 注释 |
-| MySQL emptyDir | 不影响本地（改的是 ACK 集群 live YAML） |
+| 改动 | 方式 | 位置 |
+|------|------|------|
+| JAVA_TOOL_OPTIONS 云上空值 | Kustomize inline strategic merge patch | `cloud/kustomization.yaml` |
+| MySQL hostPath→emptyDir | Kustomize JSON patch | `cloud/patches/mysql-emptydir.yaml` |
+| OTEL initContainer 移除 | Kustomize JSON patch | `cloud/patches/remove-otel.yaml` |
+
+> 所有云上差异均在 `infra/kubernetes/cloud/` overlay 中管理，base 清单保持纯净。
 
 ---
 
@@ -141,8 +144,14 @@ ACK 托管版（华南3 广州）
 | ci.sh 6-stage（harbor01） | ✅ 全流程 |
 | smoke-test（harbor01） | ✅ 4/4 pass |
 | PaymentServiceTest（10 tests） | ✅ GitHub + harbor01 |
-| ACK 5 服务 Running | ✅ port-forward 验证 |
-| JAVA_TOOL_OPTIONS 已恢复 | ✅ 4/4 |
+| ACK 5 服务 Running | ✅ port-forward curl health SUCCESS |
+| Ingress 公网访问 | ❌ 待解决：nginx-ingress 镜像被 GFW 阻断，ACK 托管版 Ingress 替代 |
+| cloud overlay 不污染 base | ✅ JAVA_TOOL_OPTIONS 通过 inline patch、MySQL PVC 通过 mysql-emptydir patch |
+| Q5 JDK 21 编译 | ✅ harbor01 `mvn clean compile test` |
+| Q6 ghcr.nju.edu.cn 可达性 | ✅ HTTP 200, registry/2.0 API（Trivy DB 下载成功即验证） |
+| Q7 Maven Central 内网可达 | ✅ Q5 编译通过间接验证（aliyun 镜像可下载依赖） |
+| Q8 Gitleaks pre-commit 兼容 | ✅ harbor01 + master01 均 8.30.1 |
+| Q9 飞书 webhook 内网可达 | ⚠️ `open.feishu.cn` 域名可达（Tengine 响应），实际 webhook 未配置 SECRET |
 
 ### 待 S4/S5 处理
 
@@ -172,4 +181,4 @@ main ←（待 PR）feature/ci-pipeline
 ---
 
 **创建时间**：2026-06-04 20:45 CST
-**状态**：S3+ACK 实施完成，待 PR 合并到 main
+**状态**：S3+ACK 实施完成

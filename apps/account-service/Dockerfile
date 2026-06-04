@@ -12,6 +12,6 @@ WORKDIR /app
 COPY --from=builder /app/account-service/target/*.jar app.jar
 EXPOSE 8082
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost:8082/api/accounts/health || exit 1
+  CMD wget -qO- http://localhost:8082/actuator/health || exit 1
 USER appuser
 ENTRYPOINT ["java", "-jar", "app.jar"]

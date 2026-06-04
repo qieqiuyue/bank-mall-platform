@@ -47,6 +47,22 @@
     </dependencies>
   </dependencyManagement>
 
+  <repositories>
+    <repository>
+      <id>central</id>
+      <url>https://repo.maven.apache.org/maven2</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <id>central</id>
+      <url>https://repo.maven.apache.org/maven2</url>
+      <releases><enabled>true</enabled></releases>
+    </pluginRepository>
+  </pluginRepositories>
+
   <modules>
     <module>auth-service</module>
     <module>account-service</module>

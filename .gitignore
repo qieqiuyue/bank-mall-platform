@@ -74,3 +74,6 @@ assets/screenshots/
 # === Test Reports ===
 **/test-output/
 **/surefire-reports/
+
+# OpenCode internal files
+.opencode/

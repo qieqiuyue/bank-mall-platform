@@ -51,7 +51,7 @@ spec:
         - name: SPRING_APPLICATION_NAME
           value: notification-service
         - name: JAVA_TOOL_OPTIONS
-          value: -javaagent:/otel/opentelemetry-javaagent.jar  # cloud: set to "" (no Jaeger)
+          value: -javaagent:/otel/opentelemetry-javaagent.jar
         - name: OTEL_SERVICE_NAME
           value: notification-service
         volumeMounts:

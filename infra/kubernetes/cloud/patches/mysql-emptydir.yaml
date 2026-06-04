@@ -1,0 +1,8 @@
+# ACK demo: hostPath PVC → emptyDir
+# Production would use alicloud-disk StorageClass via CSI
+# This is documented as a known demo limitation, not a production pattern
+- op: remove
+  path: /spec/template/spec/volumes/0/persistentVolumeClaim
+- op: add
+  path: /spec/template/spec/volumes/0/emptyDir
+  value: {}

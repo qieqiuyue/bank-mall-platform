@@ -27,3 +27,20 @@ patches:
     target:
       kind: Deployment
       name: mysql
+  # Remove OTEL initContainer from 4 services (ACK has no Jaeger)
+  - path: patches/remove-otel.yaml
+    target:
+      kind: Deployment
+      name: auth-service
+  - path: patches/remove-otel.yaml
+    target:
+      kind: Deployment
+      name: account-service
+  - path: patches/remove-otel.yaml
+    target:
+      kind: Deployment
+      name: payment-service
+  - path: patches/remove-otel.yaml
+    target:
+      kind: Deployment
+      name: notification-service

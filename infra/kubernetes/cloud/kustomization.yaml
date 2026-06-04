@@ -4,18 +4,18 @@ kind: Kustomization
 resources:
   - ../base
 
-# Image registry override: Harbor (10.0.0.61) → ACR (registry.cn-hangzhou.aliyuncs.com)
+# Image registry override: Harbor (10.0.0.61) → ACR (Guangzhou personal instance)
 images:
   - name: 10.0.0.61/bank-mall/auth-service
-    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/bank-mall-auth
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-auth
   - name: 10.0.0.61/bank-mall/account-service
-    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/bank-mall-account
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-account
   - name: 10.0.0.61/bank-mall/payment-service
-    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/bank-mall-payment
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-payment
   - name: 10.0.0.61/bank-mall/notification-service
-    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/bank-mall-notification
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-notification
   - name: mysql
-    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/mysql
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/mysql
 
 patches:
   # Remove nodeName: k8s-worker01 — let ACK scheduler place pods

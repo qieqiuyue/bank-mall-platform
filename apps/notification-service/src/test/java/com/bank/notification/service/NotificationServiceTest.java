@@ -20,6 +20,7 @@ import static org.mockito.Mockito.when;
 class NotificationServiceTest {
 
     @Mock NotificationRepository repo;
+    @Mock com.bank.notification.metrics.NotificationMetrics metrics;
     @InjectMocks NotificationService service;
 
     @Test

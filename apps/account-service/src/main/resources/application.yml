@@ -29,6 +29,11 @@ logging:
     root: ${LOG_LEVEL:INFO}
     com.bank: DEBUG
 
+# S4 Chaos Engineering: configurable delay for debit operation (default 0ms = no delay)
+account:
+  chaos:
+    debit-delay-ms: ${ACCOUNT_CHAOS_DEBIT_DELAY_MS:0}
+
 management:
   endpoints:
     web:

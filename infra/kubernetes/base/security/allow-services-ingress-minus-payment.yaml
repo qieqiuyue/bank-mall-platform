@@ -1,0 +1,62 @@
+# 临时文件：allow-services-ingress-minus-payment.yaml
+# 用途：S4 故障演练 — NetworkPolicy 误配场景
+# 效果：从 ingress 白名单中移除 payment-service，但保留 Ingress Controller、monitoring、kubelet probe 等必要来源
+# 恢复：apply 回原始的 allow-services-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-services-ingress
+  namespace: bank-mall
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: bank-mall
+  policyTypes:
+    - Ingress
+  ingress:
+    # 白名单 1：同 namespace 的服务（除 payment-service 外）
+    - from:
+        - podSelector:
+            matchLabels:
+              app: auth-service
+        - podSelector:
+            matchLabels:
+              app: notification-service
+        # 注意：故意不包含 app: payment-service
+      ports:
+        - protocol: TCP
+          port: 8081
+        - protocol: TCP
+          port: 8082
+        - protocol: TCP
+          port: 8083
+        - protocol: TCP
+          port: 8084
+    # 白名单 2：Ingress Controller（外部流量）
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8081
+        - protocol: TCP
+          port: 8082
+        - protocol: TCP
+          port: 8083
+        - protocol: TCP
+          port: 8084
+    # 白名单 3：Prometheus 监控
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8081
+        - protocol: TCP
+          port: 8082
+        - protocol: TCP
+          port: 8083
+        - protocol: TCP
+          port: 8084

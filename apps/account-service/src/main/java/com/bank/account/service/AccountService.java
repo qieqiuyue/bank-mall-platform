@@ -10,6 +10,7 @@ import com.bank.account.repository.AccountRepository;
 import com.bank.account.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,10 @@ public class AccountService {
     private final TransactionRepository txnRepo;
 
     private final com.bank.account.metrics.AccountMetrics metrics;
+
+    // S4 Chaos Engineering: configurable delay for slow-call fault injection
+    @Value("${account.chaos.debit-delay-ms:0}")
+    private long debitDelayMs;
 
     public AccountService(AccountRepository accountRepo, TransactionRepository txnRepo,
                           com.bank.account.metrics.AccountMetrics metrics) {
@@ -115,6 +120,17 @@ public class AccountService {
     }
 
     private TransactionResponse doDebitWithType(String accountNo, DebitRequest req, TransactionType type) {
+        // S4 Chaos Engineering: inject configurable delay for slow-call fault injection
+        if (debitDelayMs > 0) {
+            try {
+                Thread.sleep(debitDelayMs);
+                log.info("[CHAOS] Injected delay of {}ms for debit on account {}", debitDelayMs, accountNo);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("[CHAOS] Delay interrupted for account {}", accountNo);
+            }
+        }
+
         Account account = findAccount(accountNo);
         if (account.getBalance().compareTo(req.getAmount()) < 0) {
             throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE,

@@ -13,6 +13,7 @@ resources:
   - mysql/service.yaml
   - mysql/storage.yaml
   - mysql/initdb-configmap.yaml
+  - mysql/secret.yaml
   # Microservices
   - auth-service/deployment.yaml
   - auth-service/service.yaml

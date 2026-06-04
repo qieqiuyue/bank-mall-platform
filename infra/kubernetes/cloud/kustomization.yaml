@@ -14,6 +14,8 @@ images:
     newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-payment
   - name: 10.0.0.61/bank-mall/notification-service
     newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-notification
+  - name: 10.0.0.61/bank-mall/otel-agent-init
+    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-otel-agent-init
 patches:
   # Ingress: NodePort → LoadBalancer (ACK auto-creates SLB)
   - path: patches/ingress-lb.yaml

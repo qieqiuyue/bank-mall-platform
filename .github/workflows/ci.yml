@@ -2,94 +2,100 @@ name: Bank Mall CI/CD
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
     paths:
-      - 'bank-digital-platform/**'
-      - 'k8s/**'
+      - 'apps/**'
+      - 'infra/**'
       - 'scripts/**'
+      - '.github/workflows/**'
   pull_request:
-    branches: [main, master]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Image version tag'
-        default: '1.0.0'
-        required: false
+    branches: [main]
 
 env:
-  REGISTRY: 10.0.0.61
-  NAMESPACE: bank-mall
-  VERSION: ${{ github.event.inputs.version || '1.0.0' }}
+  REGISTRY: ghcr.nju.edu.cn
+  IMAGE_NAME: ${{ github.repository }}
+  VERSION: ${{ github.sha }}
 
 jobs:
-  build-and-test:
+  # ── Job 1: Secret detection (first gate) ──────────────────────
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Job 2: Static analysis ────────────────────────────────────
+  semgrep:
+    needs: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: semgrep/semgrep-action@v1
+      with:
+        config: >-
+          p/java-lang-security
+          p/generic-secrets
+          p/java-spring-security
+
+  # ── Job 3: Unit tests (parallel matrix) ───────────────────────
+  test:
+    needs: gitleaks
     runs-on: ubuntu-latest
     strategy:
       matrix:
         service: [auth-service, account-service, payment-service, notification-service]
-
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
         cache: 'maven'
+    - run: cd apps/${{ matrix.service }} && mvn test -q
 
-    - name: Build ${{ matrix.service }}
-      run: |
-        cd bank-digital-platform/${{ matrix.service }}
-        mvn clean compile -DskipTests -q
-
-    - name: Run tests
-      run: |
-        cd bank-digital-platform/${{ matrix.service }}
-        mvn test -q || echo "No tests defined (expected for current sprint)"
-
-  docker-build:
-    needs: build-and-test
+  # ── Job 4: Build + Trivy scan (main only, hard gate) ──────────
+  build-and-scan:
+    needs: [test, semgrep]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
-
+    if: github.ref == 'refs/heads/main'
     strategy:
       matrix:
         service: [auth-service, account-service, payment-service, notification-service]
-
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: 'maven'
+    - run: cd apps/${{ matrix.service }} && mvn package -DskipTests -q
+    - uses: docker/setup-buildx-action@v3
+    - uses: docker/build-push-action@v5
+      with:
+        context: apps/${{ matrix.service }}
+        push: false
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ env.VERSION }}
+        load: true
+    - uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ env.VERSION }}
+        severity: 'HIGH,CRITICAL'
+        exit-code: 1
+        format: 'table'
 
-    - name: Build Docker image
-      run: |
-        cd bank-digital-platform/${{ matrix.service }}
-        docker build -t ${REGISTRY}/${NAMESPACE}/${{ matrix.service }}:${VERSION} .
-
-    # Note: docker push to 10.0.0.61 (internal Harbor) not possible from GitHub Actions.
-    # In production, either:
-    #   1. Use a self-hosted runner inside the VMware network
-    #   2. Expose Harbor via public IP / VPN
-    #   3. Use a cloud-based registry (Docker Hub, GHCR, ACR, etc.)
-    # For this project, run scripts/ci.sh on the Harbor/build node instead.
-
-  deploy:
-    needs: docker-build
+  # ── Job 5: Feishu notification ─────────────────────────────────
+  notify:
+    needs: [build-and-scan]
+    if: always()
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
-
     steps:
-    - name: Deploy reminder
+    - name: Feishu webhook
       run: |
-        echo "=== Deploy step ==="
-        echo "K8s cluster is on internal VMware NAT (10.0.0.0/24)."
-        echo "GitHub Actions cannot reach the cluster directly."
-        echo ""
-        echo "Options:"
-        echo "  1. Run on internal node: bash scripts/ci.sh"
-        echo "  2. Use self-hosted GitHub Actions runner inside VMware network"
-        echo "  3. Use webhook + local CI tool (Jenkins, Argo)"
-        echo ""
-        echo "For now, this workflow validates build only."
-        echo "Run 'bash scripts/ci.sh' on the Harbor node for full pipeline."
+        STATUS="${{ needs.build-and-scan.result }}"
+        curl -X POST "${{ secrets.FEISHU_WEBHOOK }}" \
+          -H "Content-Type: application/json" \
+          -d "{\"msg_type\":\"text\",\"content\":{\"text\":\"Bank Mall CI/CD: ${STATUS}\"}}"

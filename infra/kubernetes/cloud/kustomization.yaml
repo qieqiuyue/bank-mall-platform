@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../base
+
+# Image registry override: Harbor (10.0.0.61) → ACR (registry.cn-hangzhou.aliyuncs.com)
+images:
+  - name: 10.0.0.61/bank-mall/auth-service
+    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/bank-mall-auth
+  - name: 10.0.0.61/bank-mall/account-service
+    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/bank-mall-account
+  - name: 10.0.0.61/bank-mall/payment-service
+    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/bank-mall-payment
+  - name: 10.0.0.61/bank-mall/notification-service
+    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/bank-mall-notification
+  - name: mysql
+    newName: registry.cn-hangzhou.aliyuncs.com/qieqiuyue/mysql
+
+patches:
+  # Remove nodeName: k8s-worker01 — let ACK scheduler place pods
+  - path: patches/remove-nodename.yaml
+    target:
+      kind: Deployment
+  # Ingress: NodePort → LoadBalancer (ACK auto-creates SLB)
+  - path: patches/ingress-lb.yaml
+    target:
+      kind: Service
+      name: ingress-nginx-controller

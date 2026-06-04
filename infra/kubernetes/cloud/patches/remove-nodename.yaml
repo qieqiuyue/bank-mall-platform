@@ -1,0 +1,4 @@
+# Remove nodeName to let ACK scheduler auto-place pods
+# ACK workers are not named k8s-worker01
+- op: remove
+  path: /spec/template/spec/nodeName

@@ -8,7 +8,7 @@
 CONCURRENCY="${1:-50}"
 DURATION="${2:-180}"
 URL="${3:-http://10.0.0.31:30080/payment/api/payments}"
-ACCOUNTS=(A1001)  # 唯一真实账户，S4 前补其他测试账户
+ACCOUNTS=(A1001 USER002 USER003 USER004 USER005 USER006 USER007 USER008 USER009 USER010)
 
 # 创建临时目录存放结果
 TMPDIR=$(mktemp -d)

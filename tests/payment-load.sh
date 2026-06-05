@@ -12,7 +12,7 @@ ACCOUNTS=(A1001)  # 唯一真实账户，S4 前补其他测试账户
 
 # 创建临时目录存放结果
 TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+# trap "rm -rf $TMPDIR" EXIT  # keep results for debug
 
 echo "=== Payment Load Test ==="
 echo "URL: $URL"
@@ -28,7 +28,7 @@ run_request() {
     local idx=$((RANDOM % ${#ACCOUNTS[@]}))
     local account=${ACCOUNTS[$idx]}
     local amount=$((RANDOM % 5 + 1))
-    local idem="load-$(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo $$-$RANDOM-$RANDOM)"
+    local idem="load-$$-$RANDOM-$RANDOM-$RANDOM"
 
     local resp
     local http_code
@@ -39,7 +39,7 @@ run_request() {
         -d "{\"payerAccount\":\"$account\",\"payeeAccount\":\"MALL-SETTLEMENT\",\"amount\":$amount,\"idempotencyKey\":\"$idem\"}" \
         2>/dev/null)
 
-    http_code=$(echo "$resp" | grep -oP 'HTTP:\K\d+')
+    http_code=$(echo "$resp" | sed -n 's/.*HTTP:\([0-9]*\).*/\1/p')
 
     if [ "$http_code" = "200" ]; then
         echo "SUCCESS"

@@ -127,20 +127,14 @@ bank-mall-platform/
 | Document | Content |
 |----------|---------|
 | [`ROADMAP.md`](ROADMAP.md) | Phase status, explicit exclusions, V2 plans |
-| [`docs/execution-plan.md`](docs/execution-plan.md) | S0–S6 execution plan |
-| [`docs/execution-record.md`](docs/execution-record.md) | Design deviations, pitfalls, interview stories |
+| [`docs/project-journal.md`](docs/project-journal.md) | S0–S6 timeline: decisions, pitfalls, key data |
 | [`docs/13-design-decisions.md`](docs/13-design-decisions.md) | Technology choices with rationale |
 | [`docs/14-troubleshooting-handbook.md`](docs/14-troubleshooting-handbook.md) | Debugging guide by problem category |
+| [`docs/chaos-engineering-postmortem.md`](docs/chaos-engineering-postmortem.md) | S4 chaos engineering: load test + NetworkPolicy + Jaeger |
 | [`docs/ha-architecture-design.md`](docs/ha-architecture-design.md) | 3-master HA + Keepalived brain-split protection |
-| [`docs/s4-load-test-postmortem.md`](docs/s4-load-test-postmortem.md) | 100/200 concurrent load test + HPA analysis |
-| [`docs/s4-postmortem-02-networkpolicy.md`](docs/s4-postmortem-02-networkpolicy.md) | NetworkPolicy misconfiguration drill |
-| [`docs/s4-postmortem-03-jaeger-trace.md`](docs/s4-postmortem-03-jaeger-trace.md) | Jaeger distributed tracing validation |
-| [`docs/cicd-pipeline.md`](docs/cicd-pipeline.md) | GitHub Actions + ci.sh dual-path CI/CD |
-| [`docs/gitops-argocd.md`](docs/gitops-argocd.md) | ArgoCD Application CRs + GitOps workflow |
-| [`docs/chaos-postmortem-summary.md`](docs/chaos-postmortem-summary.md) | S4 chaos engineering summary |
-| [`docs/calico-installation.md`](docs/calico-installation.md) | Calico IPIP CNI installation |
-| [`docs/harbor-installation.md`](docs/harbor-installation.md) | Harbor registry + containerd integration |
+| [`docs/redis-idempotency-design.md`](docs/redis-idempotency-design.md) | Idempotency design: DB UNIQUE vs Redis SETNX |
 | [`docs/interview/interview-qa.md`](docs/interview/interview-qa.md) | Interview Q&A (29 questions) |
+| [`docs/interview/interview-script.md`](docs/interview/interview-script.md) | 3/5/10 minute interview scripts |
 | [`SECURITY.md`](SECURITY.md) | Security practices and production gaps |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Dev setup, pre-commit hooks, doc naming conventions |
 

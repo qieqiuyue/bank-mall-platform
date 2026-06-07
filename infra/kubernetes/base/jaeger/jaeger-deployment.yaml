@@ -59,7 +59,7 @@ spec:
             memory: 512Mi
         livenessProbe:
           httpGet:
-            path: /
+            path: /jaeger/
             port: 16686
           initialDelaySeconds: 30
           periodSeconds: 10

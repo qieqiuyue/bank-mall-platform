@@ -35,27 +35,44 @@ MYSQL_PASS=$(kubectl get secret mysql-secret -n bank-mall -o jsonpath='{.data.MY
 kubectl exec -i deploy/mysql -n bank-mall -- mysql -uroot -p${MYSQL_PASS} < /tmp/bank-mall-baseline-YYYYMMDD-HHMM.sql
 ```
 
-## 3. Jaeger NodePort 31686 跨节点不通
+## 3. Jaeger CrashLoopBackOff（已修复）
 
-**根因**：Jaeger Pod 在 worker02（10.244.69.204）。kube-proxy NodePort 在 master01 / worker01 上转发失败。Calico overlay 或 iptables NAT 层面问题，非 Jaeger 代码问题。
+**根因**（两个）：
 
-**方案 A（推荐）— port-forward**：
+1. **Liveness probe 路径错误**（`jaeger-deployment.yaml` bug）：
+   `QUERY_BASE_PATH=/jaeger` 配置下，Jaeger query HTTP server 在 `:16686/` 返回 404，只有 `/jaeger/` 有内容。probe 打 `/` → 404 → kubelet kill 容器。
+   - 修复：`path: /` → `path: /jaeger/`（已提交到 Git）
+
+2. **Badger 数据损坏**：702 次强制重启导致 `/badger/data/` 残留损坏文件，进程在 Badger 初始化后立即退出，16686 端口从未成功绑定。
+
+**完整修复流程**：
 ```bash
+# Step 1: 修 probe（master01 在线 patch）
+kubectl patch deployment jaeger -n jaeger --type=json -p='[
+  {"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/httpGet/path","value":"/jaeger/"}
+]'
+
+# Step 2: 停 Jaeger
+kubectl scale deployment jaeger -n jaeger --replicas=0
+kubectl wait --for=delete pod -l app=jaeger -n jaeger --timeout=60s
+
+# Step 3: 清 Badger 磁盘脏数据（worker02）
+ssh root@10.0.0.42 "rm -rf /data/jaeger-badger/*"
+
+# Step 4: 重建 PV + PVC + 启动
+kubectl delete pvc jaeger-badger-pvc -n jaeger 2>/dev/null
+kubectl apply -f infra/kubernetes/base/jaeger/jaeger-pv.yaml
+kubectl apply -f infra/kubernetes/base/jaeger/jaeger-storage.yaml
+kubectl scale deployment jaeger -n jaeger --replicas=1
+kubectl wait --for=condition=ready pod -l app=jaeger -n jaeger --timeout=120s
+
+# Step 5: 验证
 kubectl port-forward -n jaeger svc/jaeger-query 16686:16686 --address=0.0.0.0 &
-# 浏览器：http://10.0.0.31:16686/jaeger
+curl -s http://localhost:16686/jaeger/api/services
+# 返回: {"data":["account-service","auth-service","notification-service","payment-service"],...}
 ```
 
-**方案 B — 直连 worker02 NodePort**：
-```bash
-curl http://10.0.0.42:31686/jaeger/api/services
-# 浏览器：http://10.0.0.42:31686/jaeger
-```
-
-**方案 C — 迁 Jaeger 到 master01**（不推荐，改 Git manifest 更好）：
-```bash
-kubectl patch deployment jaeger -n jaeger -p \
-  '{"spec":{"template":{"spec":{"nodeSelector":{"kubernetes.io/hostname":"k8s-master01"}}}}}'
-```
+**注意**：PV (`jaeger-pv.yaml`) 和 PVC (`jaeger-storage.yaml`) 是两个独立文件，重建时都要 apply。
 
 ## 4. Grafana SLO 面板验证
 

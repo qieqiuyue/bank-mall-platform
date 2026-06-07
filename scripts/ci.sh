@@ -94,11 +94,14 @@ if command -v trivy >/dev/null 2>&1; then
     echo "[INFO] Java DB not cached — skipping (NJU mirror unavailable, vuln DB alone sufficient)"
   fi
 
-  # Use docker save pipe — bypasses snap sandbox + Harbor HTTP auth issues
+  # docker save to temp file — bypasses snap sandbox + Harbor HTTP auth
+  SCAN_TAR=$(mktemp /tmp/trivy-scan-XXXXXX.tar)
+  trap "rm -f ${SCAN_TAR}" EXIT
   for service in "${SERVICES[@]}"; do
     image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
-    echo "Scanning ${image} (via docker save pipe)..."
-    docker save "${image}" | trivy image --input - ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 2>&1 || true
+    echo "Scanning ${image}..."
+    docker save "${image}" -o "${SCAN_TAR}"
+    trivy image --input "${SCAN_TAR}" ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 2>&1 || true
   done
 else
   echo "[WARN] Trivy not installed — skipping scan"

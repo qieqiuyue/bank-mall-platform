@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.auth.image.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.auth.image.name }}
+    {{- include "bank-mall.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Values.auth.image.name }}
+  ports:
+  - name: http
+    port: {{ .Values.auth.ports.http }}
+    targetPort: {{ .Values.auth.ports.http }}
+    protocol: TCP

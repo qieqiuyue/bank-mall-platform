@@ -1,0 +1,44 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bank-mall-ingress
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "bank-mall.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+  - http:
+      paths:
+      - path: /auth
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.auth.image.name }}
+            port:
+              number: {{ .Values.auth.ports.http }}
+      - path: /account
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.account.image.name }}
+            port:
+              number: {{ .Values.account.ports.http }}
+      # payment-service — TODO: template from Kustomize
+      - path: /payment
+        pathType: Prefix
+        backend:
+          service:
+            name: payment-service
+            port:
+              number: 8083
+      # notification-service — TODO: template from Kustomize
+      - path: /notification
+        pathType: Prefix
+        backend:
+          service:
+            name: notification-service
+            port:
+              number: 8084
+{{- end }}

@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.account.image.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.account.image.name }}
+    {{- include "bank-mall.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.account.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.account.image.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.account.image.name }}
+        {{- include "bank-mall.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Values.account.image.name }}
+        image: {{ include "bank-mall.image" (dict "imageName" .Values.account.image.name "tag" .Values.account.image.tag "Values" .Values) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.account.ports.http }}
+          protocol: TCP
+        resources:
+          {{- toYaml .Values.account.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.account.probes.liveness.path }}
+            port: {{ .Values.account.probes.liveness.port }}
+          initialDelaySeconds: {{ .Values.account.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.account.probes.liveness.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.account.probes.readiness.path }}
+            port: {{ .Values.account.probes.readiness.port }}
+          initialDelaySeconds: {{ .Values.account.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.account.probes.readiness.periodSeconds }}

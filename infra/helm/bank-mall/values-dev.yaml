@@ -1,0 +1,20 @@
+# Dev environment overrides
+auth:
+  replicas: 1
+  image:
+    tag: "latest"
+account:
+  replicas: 1
+  image:
+    tag: "latest"
+payment:
+  replicas: 1
+  image:
+    tag: "latest"
+notification:
+  replicas: 1
+  image:
+    tag: "latest"
+mysql:
+  persistence:
+    size: 1Gi

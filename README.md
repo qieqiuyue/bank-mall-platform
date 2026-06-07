@@ -121,7 +121,7 @@ bank-mall-platform/
 ├── scripts/                           # build-images.sh, deploy.sh, smoke-test.sh, ci.sh, preflight.sh, teardown.sh, db-backup.sh, db-seed-accounts.sh
 ├── tests/                             # k6 load test + payment-load.sh
 ├── .github/workflows/ci.yml           # 5-job pipeline: gitleaks → semgrep/test → build+trivy → feishu
-├── docs/                              # 13 active docs (47 archived in Git history)
+├── docs/                              # 12 active docs (47 archived in Git history)
 ├── Makefile
 ├── ROADMAP.md
 └── SECURITY.md

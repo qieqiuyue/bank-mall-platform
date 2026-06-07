@@ -143,7 +143,7 @@ Use `feature/<descriptive-name>` naming. Past branches deleted after merge.
 11. **Health endpoint DB dependency**: auth-service `/health` calls `userRepository.count()` — if MySQL down, liveness probe fails → kubelet kills Pod → deadlock loop. Health checks must NOT depend on external services.
 12. **deploy.sh references non-existent secret.yaml**: line 15 `kubectl apply -f k8s/base/secret.yaml` — file does not exist (SealedSecret is `sealed-bank-mall.yaml`). deploy.sh may fail on first run.
 13. **DataInitializer passwords in source**: demo users `admin:123456`, `vip01:vip123` — hardcoded in `DataInitializer.java`. No `@Profile("dev")` guard. If production DB is emptied and Pod restarts, demo accounts are re-created.
-14. **Promtail `cri: {}` silently drops ALL log lines**: Promtail 2.9.8 + containerd CRI logs — remove `pipeline_stages` entirely. Raw CRI format works with LogQL.
+14. **Promtail log loss detection**: Symptoms of `cri: {}` bug (pitfall #8) — Loki returns empty query results for known-active services, `promtail_target_active` metric drops to zero, `journalctl -u promtail` shows no ERROR. If you see "no logs" in Loki but `kubectl logs` works, suspect cri pipeline.
 
 ## Key Docs
 

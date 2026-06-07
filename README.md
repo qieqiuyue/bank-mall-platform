@@ -140,7 +140,6 @@ bank-mall-platform/
 | [`docs/redis-idempotency-design.md`](docs/redis-idempotency-design.md) | Idempotency design: DB UNIQUE vs Redis SETNX |
 | [`docs/interview/interview-qa.md`](docs/interview/interview-qa.md) | Interview Q&A (29 questions) |
 | [`docs/interview/interview-script.md`](docs/interview/interview-script.md) | 3/5/10 minute interview scripts |
-| [`SECURITY.md`](SECURITY.md) | Security practices and production gaps |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Dev setup, pre-commit hooks, doc naming conventions |
 
 ## License

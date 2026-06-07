@@ -74,6 +74,16 @@ Spring Boot、Docker、Kubernetes、containerd、Harbor、Ingress Nginx、Config
 - 配置文件与镜像解耦，环境切换零代码改动
 - 故障恢复时间从手动 10 分钟缩短到自动 30 秒（探针自动重启）
 
+## 项目规模
+
+- 4 个 Spring Boot 微服务，41 个单元测试
+- 28 份技术文档 + 3 份故障复盘
+- 4 台 VMware VM（1 master + 2 worker + 1 harbor）
+- 500+ 配置项（K8s manifests + CI/CD pipelines + monitoring dashboards）
+- 200+ 次故障排障经验（GFW/containerd/Calico/Loki/Jaeger）
+
+> 以上数据来自 `project-resume.md`（已合并），保留在本文档中。
+
 ## 关键词（用于简历搜索优化）
 
 微服务、Spring Boot、Docker、Kubernetes、K8s、云原生、DevOps、容器化、Harbor、Ingress、ConfigMap、Secret、HPA、Prometheus、Grafana、Loki、Promtail、NetworkPolicy、PodSecurity、Linux

@@ -90,6 +90,8 @@
 | Kyverno | Policy-as-code for compliance enforcement |
 | Velero | Scheduled backups + disaster recovery |
 | Redis | Hot data caching, distributed locking |
+| **Chaos Engineering — 真实 OOMKill 模拟** | S4 遗留技术遗憾：4 轮尝试证明 SB 4.0.6 无法通过降 memory limit 触发内核级 OOMKill。V2 引入 `@Profile("chaos")` 混沌控制器，利用 `-XX:MaxDirectMemorySize` 解除封印 + `ByteBuffer.allocateDirect()` 堆外攻击 + Heap dump 分析（MAT/jcmd）+ JVM GC 日志解读，形成完整内存排障体系 |
+| **JVM 可观测性增强** | `-XX:+HeapDumpOnOutOfMemoryError` + `-Xlog:gc*` + Grafana JVM Dashboard + jcmd 运行时诊断 |
 
 ---
 

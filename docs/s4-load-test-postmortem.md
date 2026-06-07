@@ -116,3 +116,39 @@
 ---
 
 **结论**：HPA 扩容有效（3/4 服务从 1→3），但冷启动 60s 窗口期 + minReplicas=1 导致容量不足。生产环境最小 2 副本 + readiness probe 5s period 可以彻底解决这个问题。
+
+---
+
+## 附录：OOMKill 场景试尝（已终止，留作 V2 技术遗产）
+
+在 S4 Day 1 压测之后，尝试了 4 轮 OOMKill 模拟——降低 memory limit 触发内核级容器 OOM。**全部失败**。
+
+| 轮次 | 目标服务 | 容器 Limit | JVM Xmx | 结果 | 根因 |
+|------|---------|-----------|---------|------|------|
+| 1 | account-service | 128Mi | 128m | JVM 启动即退 | 堆+Metaspace+OTEL agent > 128Mi |
+| 2 | account-service | 256Mi | 128m | liveness 超时 0/1 循环 | Spring 7.0 + JPA 实体扫描启动太慢 |
+| 3 | account-service | 320Mi | 256m | 能启动，50 并发压不崩 | LimitRange 不允许低于 128Mi，压测缺口太小 |
+| 4 | notification-service | 128Mi | 64m | 同轮次 1 — JVM 启动即退 | 同上 |
+
+### 技术分析
+
+Spring Boot 4.0.6 每个服务的最小可行内存约 320Mi，因为组成包括：
+
+| 组件 | 估算占用 |
+|------|---------|
+| JVM 堆（最小） | 128MB |
+| Metaspace（Spring AOP + JPA 实体 + OTEL weaving） | 60-80MB |
+| 线程栈（Tomcat workers + Hikari pool） | 30-50MB |
+| OTEL Java Agent（字节码增强 + Span export） | 20-30MB |
+| OS 缓存 + JIT CodeHeap | 40-60MB |
+| **合计** | **≥ 280Mi** |
+
+K8s LimitRange 强制 `requests.memory >= 128Mi`，且 `limits.memory >= requests.memory`。因此无法设置 `limits: 64Mi` —— 设 128Mi JVM 启动即退，设 320Mi+ 则压测无法触发 OOM。
+
+### 结论
+
+**在本项目技术栈下，OOMKill 无法通过单纯降低 memory limit 复现。** 这不是技术失败——恰恰证明了生产级 Java 服务的 JVM 护城河效应：`-Xmx` 形成的堆内存防护 + LimitRange 的安全底线，使得正常流量模型难以触发内核级 OOMKill。真实生产环境 OOMKill 通常是 **非堆泄露（Direct Memory / 线程泄露 / OTEL agent 内存泄露）**，而非堆内压力。
+
+### V2 规划
+
+此技术遗憾已纳入 V2 Roadmap。V2 将通过 `@Profile("chaos")` 隔离的混沌控制器 + `-XX:MaxDirectMemorySize` 封印解除 + `ByteBuffer.allocateDirect()` 堆外攻击 + Heap dump 分析（MAT/jcmd）完成完整的内存排障体系。

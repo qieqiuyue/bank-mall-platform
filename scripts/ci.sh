@@ -65,33 +65,39 @@ done
 # ── Stage 4/6: Trivy Scan (soft gate) ───────────────────────────
 log_section "Stage 4/6: Trivy Scan (soft gate — records, does not block)"
 
-# GFW constraint: ghcr.io blocked → Trivy DB download fails.
-# Workaround 1: use ghcr.nju.edu.cn mirror for first-time DB download
-# Workaround 2: use --skip-db-update if DB already cached locally
-# Trivy DB cache path: ~/.cache/trivy/db/ (or $TRIVY_CACHE_DIR)
+# trivy-db is an OCI artifact (NOT a container image).
+# Hosted on ghcr.io/aquasecurity/trivy-db — GFW throttles to 30-50 KiB/s.
+# One-time cost: first download caches DB to ~/.cache/trivy/db/
+# After that, --skip-db-update makes all scans instant (GFW-safe).
+#
+# Pre-cache (run once on harbor01):
+#   trivy image --download-db-only
+#   # ~95 MiB, ~30 min over GFW. One-time cost.
 
-TRIVY_DB_REPO="${TRIVY_DB_REPO:-ghcr.nju.edu.cn/aquasecurity/trivy-db}"
 TRIVY_CACHE_DIR="${TRIVY_CACHE_DIR:-${HOME}/.cache/trivy}"
 
 if command -v trivy >/dev/null 2>&1; then
-  # Check if DB is already cached
   if [[ -d "${TRIVY_CACHE_DIR}/db" ]] && [[ -f "${TRIVY_CACHE_DIR}/db/metadata.json" ]]; then
+    echo "[INFO] Trivy DB cached — --skip-db-update (GFW-safe)"
     DB_FLAGS="--skip-db-update"
-    echo "[INFO] Trivy DB cached — skipping update (GFW-safe)"
   else
-    DB_FLAGS="--db-repository ${TRIVY_DB_REPO}"
-    echo "[INFO] Trivy DB not cached — downloading via ${TRIVY_DB_REPO} (NJU mirror)"
+    echo "[WARN] Trivy DB not cached — skipping scan (GFW blocks ghcr.io download)"
+    echo "  Pre-cache once: trivy image --download-db-only"
+    echo "  ($(du -sh ${TRIVY_CACHE_DIR}/db 2>/dev/null || echo '0') cached so far)"
+    DB_FLAGS="__SKIP__"
   fi
 
-  for service in "${SERVICES[@]}"; do
-    image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
-    echo "Scanning ${image}..."
-    trivy image ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 "${image}" 2>&1 || true
-  done
+  if [[ "${DB_FLAGS}" != "__SKIP__" ]]; then
+    for service in "${SERVICES[@]}"; do
+      image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
+      echo "Scanning ${image}..."
+      trivy image ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 "${image}" 2>&1 || true
+    done
+  fi
 else
   echo "[WARN] Trivy not installed — skipping scan"
   echo "  Install: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh"
-  echo "  Pre-cache DB (GFW-safe): trivy image --download-db-only --db-repository ghcr.nju.edu.cn/aquasecurity/trivy-db"
+  echo "  Pre-cache DB (one-time): trivy image --download-db-only"
 fi
 
 # ── Stage 5/6: Deploy (GitOps via ArgoCD) ───────────────────────

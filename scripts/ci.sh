@@ -70,9 +70,9 @@ log_section "Stage 4/6: Trivy Scan (soft gate — records, does not block)"
 # One-time cost: first download caches DB to ~/.cache/trivy/db/ (2 files: metadata.json + trivy.db).
 # After that, --skip-db-update + --offline-scan makes all scans instant (zero network, GFW-safe).
 #
-# Pre-cache (run once on harbor01, ~30 min over GFW):
-#   trivy image --download-db-only              # ~95 MiB, vulnerability DB
-#   trivy image --download-java-db-only         # Java-specific DB
+# Pre-cache (run once on harbor01, ~50 min over GFW — MUST set --timeout):
+#   trivy image --download-db-only --timeout 120m       # ~95 MiB, vulnerability DB
+#   trivy image --download-java-db-only --timeout 30m   # Java-specific DB
 
 TRIVY_CACHE_DIR="${TRIVY_CACHE_DIR:-${HOME}/.cache/trivy}"
 
@@ -105,14 +105,16 @@ if command -v trivy >/dev/null 2>&1; then
     done
   else
     echo "[WARN] Trivy DB not fully cached — skipping scan"
-    echo "  Pre-cache once:"
-    echo "    trivy image --download-db-only        # ~95 MiB, ~30 min first time"
-    echo "    trivy image --download-java-db-only   # Java vuln data"
+    echo "  Pre-cache once (MUST set --timeout for GFW):"
+    echo "    trivy image --download-db-only --timeout 120m"
+    echo "    trivy image --download-java-db-only --timeout 30m"
   fi
 else
   echo "[WARN] Trivy not installed — skipping scan"
   echo "  Install: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh"
-  echo "  Pre-cache DB (one-time): trivy image --download-db-only && trivy image --download-java-db-only"
+  echo "  Pre-cache DB (one-time, MUST use --timeout):"
+  echo "    trivy image --download-db-only --timeout 120m"
+  echo "    trivy image --download-java-db-only --timeout 30m"
 fi
 
 # ── Stage 5/6: Deploy (GitOps via ArgoCD) ───────────────────────

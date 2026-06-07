@@ -60,8 +60,8 @@
 - [x] Preflight — test accounts (×10) + DB baseline backup + Jaeger fix + Grafana SLO 验证
 - [x] Extended load — 100/200 concurrent + HPA 扩容观察 + 冷启动死亡螺旋复盘 ✅
 - [x] Scenario 1: OOMKilled — 已删除。Spring Boot 4.0.6 + OTEL agent + JPA 启动 ≥320Mi，无法在 LimitRange 128Mi 和正常 512Mi 之间找到可 OOM 窗口。详见下文 ## OOMKilled 场景删除说明
-- [ ] Scenario 2: NetworkPolicy — 切断 payment→account ingress
-- [ ] Scenario 3: Jaeger slow-call — account-service Thread.sleep + trace 定位
+- [x] Scenario 2: NetworkPolicy — 切断 payment→account ingress ✅（故障注入 + `describe netpol` 排障 + 恢复, postmortem-02）
+- [x] Scenario 3: Jaeger trace — 5 服务 OTEL 注入验证，emptydir 修复三次崩溃，慢调用边界已记录 ✅（postmortem-03）
 - [x] DB cleanup — 备份恢复验证 ✅
 - [x] 压测复盘 — `docs/s4-load-test-postmortem.md` ✅
 

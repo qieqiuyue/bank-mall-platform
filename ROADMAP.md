@@ -50,7 +50,7 @@
 - [x] Gitleaks pre-commit hook and CI gate — `.pre-commit-config.yaml` + `.gitleaks.toml` + CI gitleaks job
 - [x] Trivy image scanning — CI hard gate (HIGH/CRITICAL) + `scripts/ci.sh` soft gate (NJU mirror for GFW)
 - [x] GitHub Actions full pipeline — 5 jobs: gitleaks → semgrep+test → build+trivy → feishu
-- [x] `scripts/ci.sh` internal delivery automation — build→push→scan→deploy→verify（含 Trivy GFW 镜像回退）
+- [x] `scripts/ci.sh` internal delivery automation — 2026-06-07 harbor01 端到端验证通过（211s，4/4 Trivy 零高危，NJU 镜像 17s 拉 DB）
 - [x] Feishu bot CI/CD notifications — GitHub Actions notify job + ci.sh webhook
 - [x] Gitleaks block case study — `docs/29-gitleaks-blocking-case.md`（pre-commit 阻断 → 修复 → 重新提交全流程）
 

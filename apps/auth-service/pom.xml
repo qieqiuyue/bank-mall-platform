@@ -75,6 +75,11 @@
       <version>0.12.6</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- Swagger/OpenAPI -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    </dependency>
     <!-- Spring Security Crypto (BCrypt, standalone, no Spring Security framework) -->
     <dependency>
       <groupId>org.springframework.security</groupId>

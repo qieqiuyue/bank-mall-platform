@@ -1,24 +1,38 @@
 # Bank Mall Cloud-Native Platform
 
-A cloud-native microservices platform for a commercial bank e-commerce system — built from bare-metal Kubernetes to full-stack observability, GitOps delivery, and security hardening.
+一个从裸金属搭建到 GitOps 交付的银行电商云原生平台。区别于 Hello World demo：它跑在 4 台 VMware 虚拟机的真实 K8s 集群上，有 4 个 Spring Boot 微服务（BCrypt+JWT、JPA+乐观锁、RestClient+补偿事务）、完整可观测性（Prometheus+Grafana+Loki+Jaeger）、NetworkPolicy 零信任安全模型、以及 ArgoCD 驱动的一站式 CI/CD 流水线。每个组件都经历过故障验证——不只是能部署，还能在 NetworkPolicy 误配、冷启动风暴、慢调用等故障下正确降级。
+
+A cloud-native microservices platform for a commercial bank e-commerce system — built from bare-metal Kubernetes to full-stack observability, GitOps delivery, and security hardening. Unlike tutorial demos, this platform has been battle-tested through chaos engineering: NetworkPolicy misconfigurations, HPA cold-start death spirals, and distributed tracing root-cause analysis.
 
 [![Java](https://img.shields.io/badge/Java_21-ED8B00?logo=openjdk&logoColor=white)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot_4.0.6-6DB33F?logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes_v1.36-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 [![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
 
-## Overview
+## 项目数据 / By the Numbers
 
-The platform runs a payment chain across four microservices — authentication, accounts, payments, and notifications — on a VMware-based Kubernetes cluster. Every infrastructure component (ingress, monitoring, logging, tracing, secret management, network policies) is declared as code under `infra/kubernetes/`.
+| 指标 | 数值 |
+|------|------|
+| 微服务 | 4（auth, account, payment, notification） |
+| 单元测试 | 41 |
+| K8s 资源 | 16 资源（含监控/安全/网络策略） |
+| 技术文档 | 28 份 + 3 份故障复盘 |
+| CI/CD 全流程 | 211 秒（harbor01 `make ci`） |
+| 运维 Skill | 9 个 |
+| 集群节点 | 4 台 VMware VM（1 master + 2 worker + 1 harbor） |
+| 故障演练场景 | 2/3 通过（HPA 冷启动风暴 + NetworkPolicy 误配） |
 
-| Component | Capability |
-|-----------|-----------|
-| **GitOps** | ArgoCD watches this repo; auto-sync with prune and self-heal |
-| **Observability** | Prometheus + Micrometer custom metrics + Grafana dashboards + Loki/Promtail log aggregation |
-| **Tracing** | Jaeger all-in-one (Badger + PVC) with OpenTelemetry Java Agent injection |
-| **Secret Management** | Bitnami Sealed Secrets — encrypted at rest in Git, decrypted in-cluster |
-| **Security** | NetworkPolicy deny-all / whitelist, PodSecurity baseline, PDB, ResourceQuota, LimitRange |
-| **CI/CD** | GitHub Actions for code quality gates; internal `scripts/ci.sh` for Harbor-based delivery |
+## 交付总结 / Delivery Journey
+
+| Phase | 内容 | 状态 |
+|-------|------|:---:|
+| S0 | 集群抢救 + Spring Boot 4.0.6 升级 | ✅ |
+| S1 | 业务闭环：auth JWT + account JPA + payment 补偿 + notification | ✅ |
+| S2 | 平台矩阵：ArgoCD, Jaeger, Prometheus, Grafana, Loki, Sealed Secrets, NetworkPolicy | ✅ |
+| S3 | CI/CD：GitHub Actions 5-job pipeline + harbor01 `scripts/ci.sh` | ✅ |
+| S4 | 故障演练：100/200 压测 + HPA 扩容 + NetworkPolicy 排障 + Jaeger trace | ✅ |
+| S5 | 润色：Swagger, Helm, HA 设计, README 重写 | 🔵 |
+| S6 | 加分：Velero, Argo Rollouts, Kyverno | ⚪ |
 
 ## Architecture
 
@@ -48,76 +62,81 @@ All services → Jaeger (OTLP gRPC / HTTP) for distributed tracing
 |--------|--------|
 | Language | Java 21 LTS |
 | Framework | Spring Boot 4.0.6 (Spring Framework 7.0) |
-| HTTP Client | RestClient (SB 3.2+, synchronous, streaming API) |
+| HTTP Client | RestClient (SB 3.2+, synchronous) |
 | Database | MySQL 8.0 — one database per service |
 | Migrations | Flyway |
-| Auth | BCrypt password hashing + JWT (jjwt 0.12.6) |
-| Transactions | Compensation-based eventual consistency with idempotency keys |
+| Auth | BCrypt + JWT (jjwt 0.12.6) |
+| Transactions | Compensation-based eventual consistency + idempotency keys |
+| API Docs | Swagger / OpenAPI (springdoc v3.0.0) |
 | Container Runtime | containerd + Calico (IPIP) |
 | Ingress | Ingress Nginx (DaemonSet, NodePort 30080) |
 | Registry | Harbor (private, 10.0.0.61) |
 | GitOps | ArgoCD |
 | Secrets | Bitnami Sealed Secrets |
 | Metrics | Prometheus + Micrometer |
-| Dashboards | Grafana (provisioned) |
+| Dashboards | Grafana (provisioned, 3 alert rules) |
 | Logs | Loki + Promtail |
-| Tracing | Jaeger 1.60 LTS (Badger + PVC) + OpenTelemetry Java Agent |
-| SAST / Secret Detection | Semgrep / Gitleaks (planned S3) |
+| Tracing | Jaeger 1.60 LTS + OpenTelemetry Java Agent |
+| SAST / Secret Detection | Semgrep + Gitleaks |
+| CI/CD | GitHub Actions (5 jobs) + `scripts/ci.sh` (Trivy soft gate, NJU mirror) |
+| Packaging | Helm Chart skeleton (Kustomize is V1 source of truth) |
 
 ## Quick Start
 
 ```bash
 # Build a single service (skip tests)
-cd apps/auth-service
-mvn clean package -DskipTests
+cd apps/auth-service && mvn clean package -DskipTests
 
 # Run with H2 in-memory database
 java -jar target/auth-service-1.0.0.jar --spring.profiles.active=h2
-
-# Run tests
-mvn test
 
 # Use Makefile for common operations
 make help
 make build
 make test
-make smoke-test
 make ci
+make smoke-test
 ```
 
 ## Repository Structure
 
 ```
 bank-mall-platform/
-├── apps/                              # Application source (4 microservices)
+├── apps/                              # 4 Spring Boot microservices (Maven parent POM)
 │   ├── auth-service/                  # BCrypt + JWT authentication
-│   ├── account-service/               # Account CRUD + double-entry transactions
-│   ├── payment-service/               # Payment orchestration + compensation
+│   ├── account-service/               # JPA + Flyway + optimistic locking
+│   ├── payment-service/               # RestClient + compensation + idempotency
 │   └── notification-service/          # Notification persistence
 ├── infra/                             # Infrastructure as Code
-│   ├── kubernetes/base/               # K8s manifests (deployments, services, ingress, monitoring, security, hpa)
+│   ├── kubernetes/base/               # K8s manifests (deployments, services, ingress, monitoring, security, hpa, jaeger)
+│   ├── kubernetes/cloud/              # Kustomize overlay for ACK cloud (LB ingress, no OTEL)
 │   ├── kubernetes/argocd/             # ArgoCD Application CRs
-│   └── dashboards/                    # Grafana dashboard JSON
-├── .github/workflows/                 # GitHub Actions CI
-├── scripts/                           # Build, deploy, smoke-test, ci
-├── docs/                              # Technical documentation
-├── sql/initdb/                        # MySQL bootstrap SQL
+│   ├── helm/bank-mall/                # Helm Chart skeleton (V1: Kustomize is source of truth)
+│   └── dashboards/                    # Grafana dashboard JSON (business + SLI/SLO)
+├── scripts/                           # build-images.sh, deploy.sh, smoke-test.sh, ci.sh, preflight.sh, teardown.sh, db-backup.sh, db-seed-accounts.sh
+├── tests/                             # k6 load test + payment-load.sh
+├── .github/workflows/ci.yml           # 5-job pipeline: gitleaks → semgrep/test → build+trivy → feishu
+├── docs/                              # 28 technical docs + 3 postmortems + HA design
 ├── Makefile
 ├── ROADMAP.md
 └── SECURITY.md
 ```
 
-## Documentation
+## Key Documents
 
 | Document | Content |
 |----------|---------|
-| [`docs/execution-plan.md`](docs/execution-plan.md) | Full execution plan (S0–S6) |
-| [`docs/execution-record.md`](docs/execution-record.md) | Execution log with design deviations and lessons learned |
-| [`docs/13-design-decisions.md`](docs/13-design-decisions.md) | Key technology decisions with rationale |
-| [`docs/14-troubleshooting-handbook.md`](docs/14-troubleshooting-handbook.md) | Troubleshooting guide by problem category |
-| [`docs/26-final-verification-checklist.md`](docs/26-final-verification-checklist.md) | Delivery verification checklist |
-| [`ROADMAP.md`](ROADMAP.md) | Capability roadmap and explicit exclusions |
+| [`ROADMAP.md`](ROADMAP.md) | Phase status, explicit exclusions, V2 plans |
+| [`docs/project-journal.md`](docs/project-journal.md) | S0–S6 timeline: decisions, pitfalls, key data |
+| [`docs/13-design-decisions.md`](docs/13-design-decisions.md) | Technology choices with rationale |
+| [`docs/14-troubleshooting-handbook.md`](docs/14-troubleshooting-handbook.md) | Debugging guide by problem category |
+| [`docs/chaos-engineering-postmortem.md`](docs/chaos-engineering-postmortem.md) | S4 chaos engineering: load test + NetworkPolicy + Jaeger |
+| [`docs/ha-architecture-design.md`](docs/ha-architecture-design.md) | 3-master HA + Keepalived brain-split protection |
+| [`docs/redis-idempotency-design.md`](docs/redis-idempotency-design.md) | Idempotency design: DB UNIQUE vs Redis SETNX |
+| [`docs/interview/interview-qa.md`](docs/interview/interview-qa.md) | Interview Q&A (29 questions) |
+| [`docs/interview/interview-script.md`](docs/interview/interview-script.md) | 3/5/10 minute interview scripts |
 | [`SECURITY.md`](SECURITY.md) | Security practices and production gaps |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Dev setup, pre-commit hooks, doc naming conventions |
 
 ## License
 

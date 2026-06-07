@@ -1,0 +1,6 @@
+apiVersion: v2
+name: bank-mall
+description: Bank Mall Cloud-Native Platform Helm Chart — V1 skeleton, Kustomize is source of truth
+type: application
+version: 0.1.0
+appVersion: "2.0.0"

@@ -86,6 +86,15 @@ docs/s5-interview-prep
 ### Shell
 - 用 `bash`，加 `set -euo pipefail`
 
+## 文档命名规范
+
+- 构建/部署文档：`docs/[数字前缀]-[描述].md`（例：`15-ingress-deployment.md`）
+- 故障复盘文档：`docs/s4-postmortem-[序号]-[描述].md`（例：`s4-postmortem-02-networkpolicy.md`）
+- 设计文档：`docs/[域]-[描述].md`（例：`redis-idempotency-design.md`、`ha-architecture-design.md`）
+- 总结/汇总文档：`docs/[主题]-summary.md`（例：`chaos-postmortem-summary.md`）
+- 执行阶段文档：`docs/execution-[内容].md`（例：`execution-plan.md`、`execution-record.md`）
+- **禁止**：`my-*`、`test-*`、`tmp-*`、无意义缩写、纯日期命名
+
 ## 安全
 
 - 禁止提交 `secret.yaml`、`.env`、`*.pem`、`*.key`

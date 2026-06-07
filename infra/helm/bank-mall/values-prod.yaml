@@ -1,0 +1,36 @@
+# Production environment overrides
+auth:
+  replicas: 3
+  image:
+    tag: "2.0.0"
+  resources:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+account:
+  replicas: 3
+  image:
+    tag: "2.0.0"
+  resources:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+payment:
+  replicas: 3
+  image:
+    tag: "2.0.0"
+  resources:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+notification:
+  replicas: 3
+  image:
+    tag: "2.0.0"
+  resources:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+mysql:
+  persistence:
+    size: 20Gi

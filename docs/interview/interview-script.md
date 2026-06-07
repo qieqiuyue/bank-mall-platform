@@ -156,7 +156,39 @@
 - "K8s 部署" → 我能写 YAML，能调参数
 - "配置管理" → 我懂 ConfigMap/Secret 的设计思想
 - "健康检查" → 我懂探针的设计和调优
-- "弹性伸缩" → 我懂 HPA 的设计（虽然还没完全落地，但方案清晰）
+- "弹性伸缩" → 我懂 HPA 的设计（100 并发冷启动死亡螺旋 + 503 复盘）
 - "监控告警" → 我懂 Prometheus/Grafana 的原理和配置
+
+---
+
+## 故障案例话术（3 个，追加到 5/10 分钟脚本）
+
+### 案例 1：NetworkPolicy 误配 — 全部 Pod Running 但业务不通
+
+"有一次压测，payment 全失败但所有 Pod 的状态都是 Running。payment 日志显示 `Connect timed out` 到 account-service:8082——这说明 account Pod 在运行但不可达。第二件事我确认 account Pod 是 1/1 Running，但它的业务日志没有任何来自 payment 的请求——流量根本没到。这是典型的网络层拦截。第三件事 `kubectl describe netpol -n bank-mall`——发现入站白名单只有 auth-service 和 notification-service，payment-service 被漏了。根因确认：运维在 apply YAML 时少写了一行 `app: payment-service`。恢复就是一行 `kubectl apply -f original.yaml`，然后压测恢复到 161/161 全过。这个案例说明 deny-all 白名单模型下，故障不是 Pod 挂了这种一眼能看出的问题，而是网络规则层面的隐性问题。"
+
+### 案例 2：HPA 冷启动死亡螺旋 — 100 并发 93% 503
+
+"100 并发压测时成功率只有 6.3%。503 占了 93%。这不是业务代码有问题——是 K8s 层面的容量问题。HPA 检测到 CPU 飙升触发扩容，但新 Pod 启动需要 60 秒（JPA + Flyway + Hibernate）。这 60 秒里流量全打在老 Pod 上，老 Pod CPU 打满 → 重启 → 更少健康后端 → 更多 503 → 恶性循环。200 并发反而成功率 84%——因为 JIT 在前一轮压测中预热了，热点代码编译成 native code 后每个请求处理速度快了一个数量级。这个案例说明两个事：第一，HPA 扩容的冷启动窗口是最危险的时候——生产环境必须 min=2 副本加 PDB；第二，Java 服务的 JIT 预热不能忽视——200 并发比 100 并发成功率高 13 倍，完全是预热导致的。"
+
+### 案例 3：Jaeger 慢调用 trace — P99 飙升到 5000ms
+
+"我们有一个端到端 trace 验证——冷启动 account-service 然后立即打流量。在 Jaeger UI 里选 payment-service，按 Duration 降序排列，最慢的一条 trace 总耗时 5300ms 但实际业务逻辑只跑了 50ms。展开 span tree 发现 `AccountClient.debit` 这个 span 占了 5000ms——点进去是 account-service 冷启动时的 JPA 初始化。分布式追踪的价值就在这里：不看代码、不看日志，直接定位到瓶颈所在的微服务和具体方法。V2 计划用 `@Profile('chaos')` 注入延迟来做更可控的慢调用演示。"
+
+---
+
+## 设计决策段（10 分钟脚本补充）
+
+### 为什么选 compensation 而不是 Seata？
+
+"Seata AT 模式要对数据库加 `undo_log` 表，全局事务锁由 TC 协调——架构上更重，运维需要额外维护 TC Server 的高可用。我的支付链路是 account debit + account credit + notification——扣除款没有库存扣减那种强一致性要求。补偿逻辑就是 try-catch + 3 次 reverse 重试，如果 reverse 也失败就标记 `ERROR_MANUAL_REVIEW` 等人工处理。这更契合银行对账模型——每天日终清算时会发现 '有扣款无入账' 然后冲正。这是业务现实，不是技术缺陷。"
+
+### 为什么 status 用 VARCHAR 而不是 ENUM？
+
+"MySQL ENUM 加新状态需要 ALTER TABLE——DDL 操作在有 1000 万行支付记录的表上可能锁几分钟。VARCHAR 加新状态就是一个代码 commit，零 DDL。这也是为什么 `fail_reason` 字段是 VARCHAR 而不是固定错误码——生产环境这种灵活性比一点存储开销重要得多。"
+
+### 为什么没有 Redis / Spring Cloud Gateway / 前端？
+
+"Redis 缓存的设计文档已经有了（`redis-idempotency-design.md`），但没有落地——因为平台工程这个叙事不依赖缓存层。支付幂等用 DB UNIQUE 约束就够了，不需要分布式锁。Gateway——Ingress Nginx 做了路由 rewrite，4 个服务的流量管理用不上 Spring Cloud Gateway 的过滤器链。前端——这个项目是平台工程 / SRE 方向的，核心价值在 K8s 运维和 CI/CD 而非 UI。面试时我会直接说：V1 有意识的不做这些，ROADMAP 里列出了原因和未来规划。这比硬塞一个 bootstrap 页面诚实得多。"
 
 **每个关键词都可以展开 1-2 分钟的技术细节。**

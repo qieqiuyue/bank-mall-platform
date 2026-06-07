@@ -33,7 +33,7 @@ spec:
     - protocol: TCP
       port: 8084
   # Allow OTEL trace/metric export to Jaeger (cross-namespace)
-  # Merge into single egress policy to avoid Calico multi-policy aggregation issues
+  # Note: 16686 (Jaeger UI) removed — services only need OTLP collector ports
   - to:
     - namespaceSelector:
         matchLabels:
@@ -43,5 +43,3 @@ spec:
       port: 4317
     - protocol: TCP
       port: 4318
-    - protocol: TCP
-      port: 16686

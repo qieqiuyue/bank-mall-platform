@@ -1,0 +1,17 @@
+# Staging environment overrides
+auth:
+  replicas: 2
+  image:
+    tag: "2.0.0"
+account:
+  replicas: 2
+  image:
+    tag: "2.0.0"
+payment:
+  replicas: 2
+  image:
+    tag: "2.0.0"
+notification:
+  replicas: 2
+  image:
+    tag: "2.0.0"

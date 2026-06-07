@@ -6,6 +6,9 @@ import com.bank.auth.repository.UserRepository;
 import com.bank.auth.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -16,6 +19,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "Auth", description = "认证接口 — 登录、令牌验证、用户信息")
 public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
@@ -36,6 +40,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Operation(summary = "用户登录", description = "使用 username + password 获取 JWT 令牌")
     public ApiResponse<Map<String, Object>> login(@RequestBody(required = false) Map<String, String> body) {
         if (body == null) {
             return ApiResponse.error("BAD_REQUEST", "Missing request body");
@@ -69,6 +74,8 @@ public class AuthController {
     }
 
     @PostMapping("/validate")
+    @Operation(summary = "验证令牌", description = "验证 Bearer JWT 令牌是否有效")
+    @SecurityRequirement(name = "BearerAuth")
     public ApiResponse<Map<String, Object>> validate(
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         if (authorization == null || !authorization.startsWith("Bearer ")) {
@@ -89,6 +96,8 @@ public class AuthController {
     }
 
     @GetMapping("/users/{userId}")
+    @Operation(summary = "查询用户信息", description = "根据 userId 查询用户资料（需令牌验证）")
+    @SecurityRequirement(name = "BearerAuth")
     public ApiResponse<Map<String, Object>> userProfile(@PathVariable String userId) {
         return userRepository.findByUserId(userId)
             .map(user -> {

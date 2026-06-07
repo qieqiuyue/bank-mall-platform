@@ -1,0 +1,103 @@
+# Default values for bank-mall.
+# Override per environment with values-dev.yaml / values-staging.yaml / values-prod.yaml
+
+namespace: bank-mall
+
+# Common labels
+commonLabels:
+  app.kubernetes.io/part-of: bank-mall
+  app.kubernetes.io/managed-by: Helm
+
+# Image defaults (override per service below)
+image:
+  registry: 10.0.0.61
+  repository: bank-mall
+  pullPolicy: IfNotPresent
+
+# ── auth-service ──────────────────────────────
+auth:
+  replicas: 1
+  image:
+    name: auth-service
+    tag: "2.0.0"
+  ports:
+    http: 8081
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    liveness:            # ⚠️ 与 Kustomize 保持同步，Kustomize 是 source of truth
+      path: /api/auth/health
+      port: 8081
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readiness:
+      path: /api/auth/health
+      port: 8081
+      initialDelaySeconds: 10
+      periodSeconds: 5
+
+# ── account-service ───────────────────────────
+account:
+  replicas: 1
+  image:
+    name: account-service
+    tag: "2.0.0"
+  ports:
+    http: 8082
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    liveness:
+      path: /api/accounts/health
+      port: 8082
+      initialDelaySeconds: 120
+      periodSeconds: 10
+    readiness:
+      path: /api/accounts/health
+      port: 8082
+      initialDelaySeconds: 10
+      periodSeconds: 5
+
+# ── payment-service (TODO: template from Kustomize) ──
+payment:
+  replicas: 1
+  image:
+    name: payment-service
+    tag: "2.0.0"
+  ports:
+    http: 8083
+
+# ── notification-service (TODO: template from Kustomize) ──
+notification:
+  replicas: 1
+  image:
+    name: notification-service
+    tag: "2.0.0"
+  ports:
+    http: 8084
+
+# ── MySQL ─────────────────────────────────────
+mysql:
+  image:
+    name: mysql
+    tag: "8.0"
+  ports:
+    mysql: 3306
+  persistence:
+    size: 5Gi
+
+# ── Ingress ───────────────────────────────────
+ingress:
+  enabled: true
+  nodePort: 30080
+  className: nginx

@@ -65,14 +65,16 @@
 - [x] DB cleanup — 备份恢复验证 ✅
 - [x] 压测复盘 ×3 — load-test + networkpolicy + jaeger postmortems ✅
 
-### S5：Polish & Packaging 🔵 In Progress
+### S5：Polish & Packaging ✅ Complete
 
-- [ ] Swagger/OpenAPI (springdoc-openapi v3.0.0 for SB 4.0.6) — 代码已提交，待编译验证
-- [ ] Helm Chart skeleton (2 服务样本 + 3 env values + drift warning)
-- [ ] HA architecture design document (Keepalived brain-split + etcd backup)
-- [ ] README rewrite (价值陈述 + 数据栏 + 中英双语)
-- [ ] Interview materials update (6 CI/CD Q&A + 3 fault cases + design decisions)
-- [ ] Polish fixes (HEALTHCHECK path, egress 16686, Mockito JDK21 argLine)
+- [x] Swagger/OpenAPI — springdoc v3.0.0 for SB 4.0.6, `mvn compile` 通过
+- [x] Helm Chart skeleton — 2 服务样本 + 3 env values + drift warning README
+- [x] HA architecture design — Keepalived brain-split protection + etcd backup/restore
+- [x] README rewrite — 价值陈述 + 数据栏 + 中英双语 + Key Documents 表
+- [x] Interview materials — 6 CI/CD Q&A + 3 fault case narratives + design decisions
+- [x] Polish fixes — egress 16686 removed, Mockito JDK21 argLine, Dockerfile HEALTHCHECK
+- [x] Document cleanup — 50→13 active docs（merged 2 journals + 4 postmortems, archived 47 to Git history）
+- [x] `.opencode/AGENTS.md` — SB 4.0.6 breaking changes + 8 team conventions + GFW matrix
 
 - [ ] Swagger/OpenAPI (springdoc-openapi v2)
 - [ ] Helm Charts (dev/staging/prod)
@@ -116,4 +118,4 @@
 
 ---
 
-**Last updated**: 2026-06-08 | S4 Complete, S5 In Progress
+**Last updated**: 2026-06-08 | S5 Complete ✅

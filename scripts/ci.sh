@@ -67,37 +67,52 @@ log_section "Stage 4/6: Trivy Scan (soft gate — records, does not block)"
 
 # trivy-db is an OCI artifact (NOT a container image).
 # Hosted on ghcr.io/aquasecurity/trivy-db — GFW throttles to 30-50 KiB/s.
-# One-time cost: first download caches DB to ~/.cache/trivy/db/
-# After that, --skip-db-update makes all scans instant (GFW-safe).
+# One-time cost: first download caches DB to ~/.cache/trivy/db/ (2 files: metadata.json + trivy.db).
+# After that, --skip-db-update + --offline-scan makes all scans instant (zero network, GFW-safe).
 #
-# Pre-cache (run once on harbor01):
-#   trivy image --download-db-only
-#   # ~95 MiB, ~30 min over GFW. One-time cost.
+# Pre-cache (run once on harbor01, ~30 min over GFW):
+#   trivy image --download-db-only              # ~95 MiB, vulnerability DB
+#   trivy image --download-java-db-only         # Java-specific DB
 
 TRIVY_CACHE_DIR="${TRIVY_CACHE_DIR:-${HOME}/.cache/trivy}"
 
 if command -v trivy >/dev/null 2>&1; then
-  if [[ -d "${TRIVY_CACHE_DIR}/db" ]] && [[ -f "${TRIVY_CACHE_DIR}/db/metadata.json" ]]; then
-    echo "[INFO] Trivy DB cached — --skip-db-update (GFW-safe)"
+  DB_OK=true
+  DB_FLAGS=""
+
+  # Check vulnerability DB (required)
+  if [[ -f "${TRIVY_CACHE_DIR}/db/metadata.json" ]] && [[ -f "${TRIVY_CACHE_DIR}/db/trivy.db" ]]; then
     DB_FLAGS="--skip-db-update"
   else
-    echo "[WARN] Trivy DB not cached — skipping scan (GFW blocks ghcr.io download)"
-    echo "  Pre-cache once: trivy image --download-db-only"
-    echo "  ($(du -sh ${TRIVY_CACHE_DIR}/db 2>/dev/null || echo '0') cached so far)"
-    DB_FLAGS="__SKIP__"
+    echo "[WARN] Vulnerability DB not cached — $(du -sh ${TRIVY_CACHE_DIR}/db 2>/dev/null || echo '0 bytes')"
+    DB_OK=false
   fi
 
-  if [[ "${DB_FLAGS}" != "__SKIP__" ]]; then
+  # Check Java DB (for Spring Boot apps)
+  if [[ -f "${TRIVY_CACHE_DIR}/java-db/metadata.json" ]] && [[ -f "${TRIVY_CACHE_DIR}/java-db/trivy-java.db" ]]; then
+    DB_FLAGS="${DB_FLAGS} --skip-java-db-update"
+  else
+    echo "[WARN] Java DB not cached — $(du -sh ${TRIVY_CACHE_DIR}/java-db 2>/dev/null || echo '0 bytes')"
+  fi
+
+  if $DB_OK; then
+    DB_FLAGS="${DB_FLAGS} --offline-scan"
+    echo "[INFO] Trivy DBs ready — offline scan (GFW-safe, zero network)"
     for service in "${SERVICES[@]}"; do
       image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
       echo "Scanning ${image}..."
       trivy image ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 "${image}" 2>&1 || true
     done
+  else
+    echo "[WARN] Trivy DB not fully cached — skipping scan"
+    echo "  Pre-cache once:"
+    echo "    trivy image --download-db-only        # ~95 MiB, ~30 min first time"
+    echo "    trivy image --download-java-db-only   # Java vuln data"
   fi
 else
   echo "[WARN] Trivy not installed — skipping scan"
   echo "  Install: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh"
-  echo "  Pre-cache DB (one-time): trivy image --download-db-only"
+  echo "  Pre-cache DB (one-time): trivy image --download-db-only && trivy image --download-java-db-only"
 fi
 
 # ── Stage 5/6: Deploy (GitOps via ArgoCD) ───────────────────────

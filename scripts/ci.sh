@@ -94,10 +94,11 @@ if command -v trivy >/dev/null 2>&1; then
     echo "[INFO] Java DB not cached — skipping (NJU mirror unavailable, vuln DB alone sufficient)"
   fi
 
+  # Use docker save pipe — bypasses snap sandbox + Harbor HTTP auth issues
   for service in "${SERVICES[@]}"; do
     image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
-    echo "Scanning ${image}..."
-    trivy image ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 "${image}" 2>&1 || true
+    echo "Scanning ${image} (via docker save pipe)..."
+    docker save "${image}" | trivy image --input - ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 2>&1 || true
   done
 else
   echo "[WARN] Trivy not installed — skipping scan"
@@ -106,6 +107,15 @@ fi
 
 # ── Stage 5/6: Deploy (GitOps via ArgoCD) ───────────────────────
 log_section "Stage 5/6: Deploy (Git commit + push → ArgoCD sync)"
+
+# kubectl may point to an unreachable cluster (e.g. old ACK cloud).
+# Test connectivity before attempting any cluster operations.
+HAVE_KUBECTL=false
+if command -v kubectl >/dev/null 2>&1 && kubectl cluster-info --request-timeout=5s &>/dev/null; then
+  HAVE_KUBECTL=true
+else
+  echo "[INFO] kubectl not connected — skipping cluster operations (this is a build node)"
+fi
 
 echo "Committing image tag ${VERSION} to Git..."
 cd "${ROOT_DIR}"
@@ -126,16 +136,21 @@ fi
 # ── Stage 6/6: Verify + Feishu ──────────────────────────────────
 log_section "Stage 6/6: Verify"
 
-echo ""
-echo "Pods (bank-mall):"
-kubectl get pods -n bank-mall -o wide
+if $HAVE_KUBECTL; then
+  echo ""
+  echo "Pods (bank-mall):"
+  kubectl get pods -n bank-mall -o wide
 
-echo ""
-echo "Pods (jaeger):"
-kubectl get pods -n jaeger -o wide 2>/dev/null || echo "(jaeger namespace not found)"
+  echo ""
+  echo "Pods (jaeger):"
+  kubectl get pods -n jaeger -o wide 2>/dev/null || echo "(jaeger namespace not found)"
 
-echo ""
-bash "${ROOT_DIR}/scripts/smoke-test.sh"
+  echo ""
+  bash "${ROOT_DIR}/scripts/smoke-test.sh"
+else
+  echo "[INFO] Skipping cluster verification — kubectl not available on this node"
+  echo "  Deploy from master01: cd ~/bank-mall-platform && bash scripts/deploy.sh"
+fi
 
 # ── Feishu Notification ─────────────────────────────────────────
 FEISHU_WEBHOOK="${FEISHU_WEBHOOK:-}"

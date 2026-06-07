@@ -135,6 +135,12 @@ bank-mall-platform/
 | [`docs/s4-load-test-postmortem.md`](docs/s4-load-test-postmortem.md) | 100/200 concurrent load test + HPA analysis |
 | [`docs/s4-postmortem-02-networkpolicy.md`](docs/s4-postmortem-02-networkpolicy.md) | NetworkPolicy misconfiguration drill |
 | [`docs/s4-postmortem-03-jaeger-trace.md`](docs/s4-postmortem-03-jaeger-trace.md) | Jaeger distributed tracing validation |
+| [`docs/cicd-pipeline.md`](docs/cicd-pipeline.md) | GitHub Actions + ci.sh dual-path CI/CD |
+| [`docs/gitops-argocd.md`](docs/gitops-argocd.md) | ArgoCD Application CRs + GitOps workflow |
+| [`docs/chaos-postmortem-summary.md`](docs/chaos-postmortem-summary.md) | S4 chaos engineering summary |
+| [`docs/calico-installation.md`](docs/calico-installation.md) | Calico IPIP CNI installation |
+| [`docs/harbor-installation.md`](docs/harbor-installation.md) | Harbor registry + containerd integration |
+| [`docs/interview/interview-qa.md`](docs/interview/interview-qa.md) | Interview Q&A (29 questions) |
 | [`SECURITY.md`](SECURITY.md) | Security practices and production gaps |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Dev setup, pre-commit hooks, doc naming conventions |
 

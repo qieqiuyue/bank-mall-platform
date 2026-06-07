@@ -30,7 +30,7 @@ auth:
       cpu: 500m
       memory: 512Mi
   probes:
-    liveness:
+    liveness:            # ⚠️ 与 Kustomize 保持同步，Kustomize 是 source of truth
       path: /api/auth/health
       port: 8081
       initialDelaySeconds: 30

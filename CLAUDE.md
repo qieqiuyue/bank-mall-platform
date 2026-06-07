@@ -22,15 +22,14 @@ bank-mall-platform/
 │   ├── kubernetes/cloud/              # Kustomize overlay for ACK cloud (MySQL emptydir, LB ingress, no nodeName/OTEL)
 │   ├── kubernetes/argocd/             # ArgoCD Application CRs (bank-mall, monitoring, ingress-nginx)
 │   └── dashboards/                    # Grafana dashboard JSON (business overview + SLI/SLO)
-├── scripts/                           # build-images.sh, deploy.sh, smoke-test.sh, ci.sh, preflight.sh, teardown.sh, recover.sh
+├── scripts/                           # build-images.sh, deploy.sh, smoke-test.sh, ci.sh, preflight.sh, teardown.sh, db-backup.sh, db-seed-accounts.sh
 ├── .github/workflows/ci.yml           # 5-job pipeline: gitleaks → semgrep/test → build+trivy → feishu
-├── tests/                             # k6 load test + shell payment-load
-├── docs/                              # 25+ technical documents
-├── sql/initdb/                        # MySQL bootstrap SQL
-├── pipelines/                         # gitleaks / semgrep / trivy configs
+├── tests/                             # payment-load.sh (shell-based concurrent load test)
+├── docs/                              # 12 active docs (47 archived in Git history)
+├── infra/helm/bank-mall/              # Helm Chart skeleton (V1: Kustomize is source of truth)
 ├── Makefile
 ├── ROADMAP.md                         # Phase status, V2 plans, explicit exclusions
-└── SECURITY.md                        # Security practices and production gaps
+└── CONTRIBUTING.md                    # Dev setup, pre-commit hooks, doc naming conventions
 ```
 
 ## Architecture
@@ -95,8 +94,8 @@ make teardown      # destroy all bank-mall resources
 ## Key Technical Decisions
 
 - **RestClient** (not RestTemplate/WebClient) for sync HTTP between services
-- **Compensation logic** (not Seata) — try-catch + 3x manual retry on reverse failure, `ERROR_MANUAL_REVIEW` status. Payment has idempotency key on `orderId` via DB UNIQUE constraint.
-- **Jaeger all-in-one 1.60 LTS** + Badger storage + PVC, Recreate strategy (not Operator)
+- **Compensation logic** (not Seata) — try-catch + 3x manual retry on reverse failure, `ERROR_MANUAL_REVIEW` status. Payment has idempotency key on `idempotencyKey` via DB UNIQUE constraint (`V1__create_payment_table.sql`).
+- **Jaeger all-in-one 1.60 LTS** + emptydir (`BADGER_EPHEMERAL=true`), pin k8s-worker01. Ingress route: service name is `jaeger-query` (NOT `jaeger-ui` — wrong name = 503 from S2 until S5 fix)
 - **OTEL agent injection** via initContainer — image pulled from Harbor to emptyDir, then `JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar`. Cloud overlay (`infra/kubernetes/cloud/patches/remove-otel.yaml`) strips this for ACK deployments.
 - **Sealed Secrets** for GitOps-native secret management — `infra/kubernetes/base/sealed-bank-mall.yaml` is the only encrypted secret format in Git. Plaintext `secret.yaml.example` is a template only. Real credentials never committed.
 - **NetworkPolicy** deny-all baseline with explicit whitelist rules per service (DNS, ingress, monitoring, MySQL, cross-service, Jaeger)
@@ -120,10 +119,10 @@ docker build -t <image> -f apps/auth-service/Dockerfile apps/
 5 sequential jobs in `.github/workflows/ci.yml`:
 1. **gitleaks** — secret detection, first gate, blocks on finding
 2. **semgrep** + **test** — parallel: SAST (java-lang-security, generic-secrets, java-spring-security) and JUnit matrix (4 services)
-3. **build-and-scan** (main only) — Maven package → Docker build → Trivy scan (HIGH/CRITICAL = hard gate, exit-code 1)
+3. **build-and-scan** (main only) — Maven package → Docker build → Trivy scan (HIGH/CRITICAL = hard gate, exit-code 1). Note: `push: false` by design — GitHub Actions = quality gate; harbor01 `scripts/ci.sh` = build + push to Harbor.
 4. **notify** (main only) — Feishu webhook result notification
 
-`pipelines/` contains local gitleaks/semgrep/trivy configs for pre-commit and internal CI parity.
+Local gitleaks/semgrep/trivy configs use `.gitleaks.toml` + `.semgrep.yml` in repo root.
 
 ## Git Branches
 
@@ -140,17 +139,21 @@ Use `feature/<descriptive-name>` naming. Past branches deleted after merge.
 7. **Prometheus port relabel**: do NOT replace `__address__` with port-only — k8s_sd provides correct Pod IP:port
 8. **Loki pipeline**: `cri: {}` in Promtail `pipeline_stages` silently drops all log lines with containerd CRI — remove it entirely
 9. **Calico after VM suspend**: `connection is unauthorized` → `kubectl delete pod -n calico-system <calico-node-pod>` on affected node
+10. **Jaeger Ingress never worked**: service is `jaeger-query`, Ingress YAML referenced `jaeger-ui` — 503 since S2. Fixed S5.
+11. **Health endpoint DB dependency**: auth-service `/health` calls `userRepository.count()` — if MySQL down, liveness probe fails → kubelet kills Pod → deadlock loop. Health checks must NOT depend on external services.
+12. **deploy.sh references non-existent secret.yaml**: line 15 `kubectl apply -f k8s/base/secret.yaml` — file does not exist (SealedSecret is `sealed-bank-mall.yaml`). deploy.sh may fail on first run.
+13. **DataInitializer passwords in source**: demo users `admin:123456`, `vip01:vip123` — hardcoded in `DataInitializer.java`. No `@Profile("dev")` guard. If production DB is emptied and Pod restarts, demo accounts are re-created.
+14. **Promtail `cri: {}` silently drops ALL log lines**: Promtail 2.9.8 + containerd CRI logs — remove `pipeline_stages` entirely. Raw CRI format works with LogQL.
 
 ## Key Docs
 
 | Doc | Purpose |
 |-----|---------|
-| `docs/execution-plan.md` | S0-S6 full plan |
-| `docs/execution-record.md` | Design deviations, pitfalls, interview material |
+| `ROADMAP.md` | Phase status, V2 plans, explicit exclusions |
+| `docs/project-journal.md` | S0-S6 timeline: decisions, pitfalls, key data |
 | `docs/13-design-decisions.md` | Technology choices with rationale |
 | `docs/14-troubleshooting-handbook.md` | Debugging guide by problem category |
-| `docs/26-final-verification-checklist.md` | Delivery verification |
-| `docs/polish-list.md` | Non-blocking improvements for S5 |
-| `ROADMAP.md` | Phase status, explicit V2 plans, explicit exclusions |
-| `SECURITY.md` | Security practices and production gaps |
-| `CONTRIBUTING.md` | Dev setup, pre-commit hooks, PR checklist |
+| `docs/chaos-engineering-postmortem.md` | S4 chaos engineering: load test + NetworkPolicy + Jaeger |
+| `docs/ha-architecture-design.md` | 3-master HA + Keepalived brain-split protection |
+| `docs/interview/interview-qa.md` | Interview Q&A (29 questions) |
+| `CONTRIBUTING.md` | Dev setup, pre-commit hooks, doc naming conventions |

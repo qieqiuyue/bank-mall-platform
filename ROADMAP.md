@@ -54,18 +54,25 @@
 - [x] Feishu bot CI/CD notifications — GitHub Actions notify job + ci.sh webhook
 - [x] Gitleaks block case study — `docs/29-gitleaks-blocking-case.md`（pre-commit 阻断 → 修复 → 重新提交全流程）
 
-### S4：Chaos Engineering & Load Testing 🔵 In Progress (Day 1 PM)
+### S4：Chaos Engineering & Load Testing ✅ Complete
 
 - [x] JMeter load test — baseline 50/100/200 concurrent ✅（2545/3332/3637 成功）
 - [x] Preflight — test accounts (×10) + DB baseline backup + Jaeger fix + Grafana SLO 验证
 - [x] Extended load — 100/200 concurrent + HPA 扩容观察 + 冷启动死亡螺旋复盘 ✅
-- [x] Scenario 1: OOMKilled — 已删除。Spring Boot 4.0.6 + OTEL agent + JPA 启动 ≥320Mi，无法在 LimitRange 128Mi 和正常 512Mi 之间找到可 OOM 窗口。详见下文 ## OOMKilled 场景删除说明
-- [x] Scenario 2: NetworkPolicy — 切断 payment→account ingress ✅（故障注入 + `describe netpol` 排障 + 恢复, postmortem-02）
-- [x] Scenario 3: Jaeger trace — 5 服务 OTEL 注入验证，emptydir 修复三次崩溃，慢调用边界已记录 ✅（postmortem-03）
+- [x] Scenario 1: OOMKilled — 已删除（SB 4.0.6 + OTEL agent ≥320Mi, V2 混沌工程规划）
+- [x] Scenario 2: NetworkPolicy — 切断 payment→account ingress ✅（postmortem-02）
+- [x] Scenario 3: Jaeger trace — 5 服务 OTEL 注入验证 ✅（postmortem-03）
 - [x] DB cleanup — 备份恢复验证 ✅
-- [x] 压测复盘 — `docs/s4-load-test-postmortem.md` ✅
+- [x] 压测复盘 ×3 — load-test + networkpolicy + jaeger postmortems ✅
 
-### S5：Polish & Packaging ⚪ Planned
+### S5：Polish & Packaging 🔵 In Progress
+
+- [ ] Swagger/OpenAPI (springdoc-openapi v3.0.0 for SB 4.0.6) — 代码已提交，待编译验证
+- [ ] Helm Chart skeleton (2 服务样本 + 3 env values + drift warning)
+- [ ] HA architecture design document (Keepalived brain-split + etcd backup)
+- [ ] README rewrite (价值陈述 + 数据栏 + 中英双语)
+- [ ] Interview materials update (6 CI/CD Q&A + 3 fault cases + design decisions)
+- [ ] Polish fixes (HEALTHCHECK path, egress 16686, Mockito JDK21 argLine)
 
 - [ ] Swagger/OpenAPI (springdoc-openapi v2)
 - [ ] Helm Charts (dev/staging/prod)
@@ -109,4 +116,4 @@
 
 ---
 
-**Last updated**: 2026-06-07 | S3 Complete, S4 In Progress (Day 1 PM)
+**Last updated**: 2026-06-08 | S4 Complete, S5 In Progress

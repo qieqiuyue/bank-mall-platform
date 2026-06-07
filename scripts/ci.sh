@@ -70,7 +70,6 @@ log_section "Stage 4/6: Trivy Scan (soft gate — records, does not block)"
 # Ref: https://juejin.cn/post/7553890842093535286
 
 TRIVY_DB_REPO="${TRIVY_DB_REPO:-ghcr.nju.edu.cn/aquasecurity/trivy-db}"
-TRIVY_JAVA_DB_REPO="${TRIVY_JAVA_DB_REPO:-ghcr.nju.edu.cn/aquasecurity/trivy-java-db}"
 TRIVY_CACHE_DIR="${TRIVY_CACHE_DIR:-${HOME}/.cache/trivy}"
 
 if command -v trivy >/dev/null 2>&1; then
@@ -86,12 +85,13 @@ if command -v trivy >/dev/null 2>&1; then
     echo "[INFO] Vuln DB → NJU mirror (${TRIVY_DB_REPO})"
   fi
 
+  # Java DB: NJU mirror does NOT have trivy-java-db (falls back to ghcr.io slow).
+  # Skip if not cached — vuln DB alone covers most CVEs for HIGH/CRITICAL gate.
   if [[ -f "${TRIVY_CACHE_DIR}/java-db/metadata.json" ]]; then
     DB_FLAGS="${DB_FLAGS} --skip-java-db-update"
     echo "[INFO] Java DB cached — skip update"
   else
-    DB_FLAGS="${DB_FLAGS} --java-db-repository ${TRIVY_JAVA_DB_REPO}"
-    echo "[INFO] Java DB → NJU mirror (${TRIVY_JAVA_DB_REPO})"
+    echo "[INFO] Java DB not cached — skipping (NJU mirror unavailable, vuln DB alone sufficient)"
   fi
 
   for service in "${SERVICES[@]}"; do

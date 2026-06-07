@@ -58,12 +58,12 @@
 
 - [x] JMeter load test — baseline 50/100/200 concurrent ✅（2545/3332/3637 成功）
 - [x] Preflight — test accounts (×10) + DB baseline backup + Jaeger fix + Grafana SLO 验证
-- [ ] Extended load — 100/200 concurrent + HPA 扩容观察 + Grafana 指标采集
-- [ ] Scenario 1: OOMKilled — account-service memory exhaustion
-- [ ] Scenario 2: NetworkPolicy misconfiguration
-- [ ] Scenario 3: Jaeger slow-call root cause analysis
-- [ ] DB cleanup — 备份恢复验证
-- [ ] 3 postmortem documents
+- [x] Extended load — 100/200 concurrent + HPA 扩容观察 + 冷启动死亡螺旋复盘 ✅
+- [x] Scenario 1: OOMKilled — 已删除。Spring Boot 4.0.6 + OTEL agent + JPA 启动 ≥320Mi，无法在 LimitRange 128Mi 和正常 512Mi 之间找到可 OOM 窗口。详见下文 ## OOMKilled 场景删除说明
+- [ ] Scenario 2: NetworkPolicy — 切断 payment→account ingress
+- [ ] Scenario 3: Jaeger slow-call — account-service Thread.sleep + trace 定位
+- [x] DB cleanup — 备份恢复验证 ✅
+- [x] 压测复盘 — `docs/s4-load-test-postmortem.md` ✅
 
 ### S5：Polish & Packaging ⚪ Planned
 
@@ -103,6 +103,7 @@
 | Multi-master HA (current cluster) | Experimental 1-node control plane; HA topology documented in architecture design |
 | SonarQube | Semgrep covers the same SAST use case with zero deployment overhead |
 | Seata distributed transactions | Compensation logic + daily reconciliation more closely model real payment systems |
+| **OOMKilled 场景（S4）** | Spring Boot 4.0.6 + OTEL agent + JPA 启动最小可行内存 ~320Mi。LimitRange 强制最低 128Mi 但不允许设低值；设 128-256Mi 则 JVM 启动即退（0/1 循环），设 320Mi+ 则压测无法触发 OOM。**试图模拟 OOMKill 的 4 轮尝试全部失败：account-service 128Mi→JVM 退出、256Mi→liveness 超时、320Mi→能启动但压不崩；notification-service 128Mi→同样 0/1 循环。结论：Spring Boot 4.0.6 在生产级 K8s 环境中，OOMKill 通常发生在流量峰值或线程泄露阶段，无法通过单纯降 memory limit 复现。** 从 S4 正式移除。 |
 
 ---
 

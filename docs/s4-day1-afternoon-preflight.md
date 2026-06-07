@@ -20,7 +20,7 @@ kubectl exec deploy/mysql -n bank-mall -- mysql -uroot -p${MYSQL_PASS} bank_acco
 
 ## 2. DB 基线备份
 
-**背景**：场景 1-3（OOMKilled / NetworkPolicy / Jaeger 慢调用）之前必须有恢复点。
+**背景**：场景 2-3（NetworkPolicy / Jaeger 慢调用）之前必须有恢复点。
 
 ```bash
 bash scripts/db-backup.sh

@@ -44,22 +44,25 @@
 - [x] Maven parent POM — unified dependency management (SB 4.0.6, JDK 21, jjwt 0.12.6)
 - [x] `.dockerignore` — 55-line exclusion rules
 
-### S3：Dual-Platform CI/CD 🔵 Next
+### S3：Dual-Platform CI/CD ✅
 
-- [ ] Semgrep SAST rules and CI gate
-- [ ] Gitleaks pre-commit hook and CI gate
-- [ ] Trivy image scanning (hard gate: HIGH/CRITICAL blocked)
-- [ ] GitHub Actions full pipeline (lint → test → build → scan → notify)
-- [ ] `scripts/ci.sh` internal delivery automation
-- [ ] Feishu bot CI/CD notifications
-- [ ] Gitleaks block case study (intentional secret → blocked → fix → re-commit)
+- [x] Semgrep SAST rules and CI gate — `.semgrep.yml` + GitHub Actions semgrep job
+- [x] Gitleaks pre-commit hook and CI gate — `.pre-commit-config.yaml` + `.gitleaks.toml` + CI gitleaks job
+- [x] Trivy image scanning — CI hard gate (HIGH/CRITICAL) + `scripts/ci.sh` soft gate (NJU mirror for GFW)
+- [x] GitHub Actions full pipeline — 5 jobs: gitleaks → semgrep+test → build+trivy → feishu
+- [x] `scripts/ci.sh` internal delivery automation — build→push→scan→deploy→verify（含 Trivy GFW 镜像回退）
+- [x] Feishu bot CI/CD notifications — GitHub Actions notify job + ci.sh webhook
+- [x] Gitleaks block case study — `docs/29-gitleaks-blocking-case.md`（pre-commit 阻断 → 修复 → 重新提交全流程）
 
-### S4：Chaos Engineering & Load Testing ⚪ Planned
+### S4：Chaos Engineering & Load Testing 🔵 In Progress (Day 1 PM)
 
+- [x] JMeter load test — baseline 50/100/200 concurrent ✅（2545/3332/3637 成功）
+- [x] Preflight — test accounts (×10) + DB baseline backup + Jaeger fix + Grafana SLO 验证
+- [ ] Extended load — 100/200 concurrent + HPA 扩容观察 + Grafana 指标采集
 - [ ] Scenario 1: OOMKilled — account-service memory exhaustion
 - [ ] Scenario 2: NetworkPolicy misconfiguration
 - [ ] Scenario 3: Jaeger slow-call root cause analysis
-- [ ] JMeter load test — 50/100/200 concurrent users
+- [ ] DB cleanup — 备份恢复验证
 - [ ] 3 postmortem documents
 
 ### S5：Polish & Packaging ⚪ Planned
@@ -103,4 +106,4 @@
 
 ---
 
-**Last updated**: 2026-06-04 | S2 Complete, S3 Next
+**Last updated**: 2026-06-07 | S3 Complete, S4 In Progress (Day 1 PM)

@@ -10,7 +10,7 @@
 
 ## 技术栈
 
-Spring Boot、Docker、Kubernetes、containerd、Harbor、Ingress Nginx、ConfigMap、Secret、HPA、NetworkPolicy、PodSecurity、Prometheus、Grafana、Loki、Promtail、Linux、Shell
+Spring Boot、Docker、Kubernetes、containerd、Harbor、Ingress Nginx、ConfigMap、Secret、HPA、NetworkPolicy、PodSecurity、Prometheus、Grafana、Loki、Promtail、Jaeger、ArgoCD、Helm、Swagger/OpenAPI、GitHub Actions、Sealed Secrets、Linux、Shell
 
 ## 项目背景
 

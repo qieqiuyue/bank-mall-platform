@@ -42,14 +42,11 @@ spec:
         - name: SPAN_STORAGE_TYPE
           value: badger
         - name: BADGER_EPHEMERAL
-          value: "false"
+          value: "true"
         - name: BADGER_DIRECTORY_VALUE
-          value: /badger/data
+          value: /tmp/jaeger/data
         - name: BADGER_DIRECTORY_KEY
-          value: /badger/key
-        volumeMounts:
-        - name: badger-data
-          mountPath: /badger
+          value: /tmp/jaeger/key
         resources:
           requests:
             cpu: 100m
@@ -59,7 +56,7 @@ spec:
             memory: 512Mi
         livenessProbe:
           httpGet:
-            path: /
+            path: /jaeger/
             port: 16686
           initialDelaySeconds: 30
           periodSeconds: 10
@@ -68,7 +65,4 @@ spec:
           capabilities:
             drop:
             - ALL
-      volumes:
-      - name: badger-data
-        persistentVolumeClaim:
-          claimName: jaeger-badger-pvc
+      nodeName: k8s-worker01

@@ -73,7 +73,7 @@
 | 场景 | 制造方式 | 排查手段 |
 |------|---------|---------|
 | JMeter 压测 | 并发 50/100/200 → `POST /api/payments` | Grafana + `kubectl top` |
-| 故障 1：OOMKilled | account-service 设极低 memory limit | Loki + Prometheus |
+| 故障 1：OOMKilled | **已删除** — SB 4.0.6 + OTEL + JPA 启动 ≥320Mi，无法在 LimitRange 和安全 limit 之间找到 OOM 窗口 | — |
 | 故障 2：NetworkPolicy | 拒绝 payment→account ingress | `kubectl describe netpol` |
 | 故障 3：慢调用 | account-service `Thread.sleep(2000)` | Jaeger UI |
 | 复盘 ×3 | 现象→根因→修复→MTTR→预防 | 文档 |

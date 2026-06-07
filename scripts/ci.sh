@@ -65,17 +65,57 @@ done
 # ── Stage 4/6: Trivy Scan (soft gate) ───────────────────────────
 log_section "Stage 4/6: Trivy Scan (soft gate — records, does not block)"
 
+# trivy-db on ghcr.io: GFW direct 7 KiB/s (~3h), NJU mirror 8 MiB/s (~12s).
+# Cached → skip update (instant). Not cached → NJU mirror (fast).
+# Ref: https://juejin.cn/post/7553890842093535286
+
+TRIVY_DB_REPO="${TRIVY_DB_REPO:-ghcr.nju.edu.cn/aquasecurity/trivy-db}"
+TRIVY_CACHE_DIR="${TRIVY_CACHE_DIR:-${HOME}/.cache/trivy}"
+
 if command -v trivy >/dev/null 2>&1; then
+  echo "[INFO] Trivy $(trivy -v 2>/dev/null | head -1)"
+
+  # Use --skip-*-update if DB already cached (instant), else download via NJU mirror
+  DB_FLAGS=""
+  if [[ -f "${TRIVY_CACHE_DIR}/db/metadata.json" ]]; then
+    DB_FLAGS="--skip-db-update"
+    echo "[INFO] Vuln DB cached — skip update"
+  else
+    DB_FLAGS="--db-repository ${TRIVY_DB_REPO}"
+    echo "[INFO] Vuln DB → NJU mirror (${TRIVY_DB_REPO})"
+  fi
+
+  # Java DB: let trivy manage — ghcr.io direct works at 12 MiB/s for this
+  if [[ -f "${TRIVY_CACHE_DIR}/java-db/metadata.json" ]]; then
+    DB_FLAGS="${DB_FLAGS} --skip-java-db-update"
+    echo "[INFO] Java DB cached — skip update"
+  fi
+
+  # docker save to temp file in $HOME — snap sandbox isolates /tmp but allows $HOME
+  SCAN_TAR=$(mktemp ${HOME}/trivy-scan-XXXXXX.tar)
+  trap "rm -f ${SCAN_TAR}" EXIT
   for service in "${SERVICES[@]}"; do
     image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
-    trivy image --severity HIGH,CRITICAL --exit-code 0 "${image}" || true
+    echo "Scanning ${image}..."
+    docker save "${image}" -o "${SCAN_TAR}"
+    trivy image --input "${SCAN_TAR}" ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 2>&1 || true
   done
 else
   echo "[WARN] Trivy not installed — skipping scan"
+  echo "  Install: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh"
 fi
 
 # ── Stage 5/6: Deploy (GitOps via ArgoCD) ───────────────────────
 log_section "Stage 5/6: Deploy (Git commit + push → ArgoCD sync)"
+
+# kubectl may point to an unreachable cluster (e.g. old ACK cloud).
+# Test connectivity before attempting any cluster operations.
+HAVE_KUBECTL=false
+if command -v kubectl >/dev/null 2>&1 && kubectl cluster-info --request-timeout=5s &>/dev/null; then
+  HAVE_KUBECTL=true
+else
+  echo "[INFO] kubectl not connected — skipping cluster operations (this is a build node)"
+fi
 
 echo "Committing image tag ${VERSION} to Git..."
 cd "${ROOT_DIR}"
@@ -96,16 +136,21 @@ fi
 # ── Stage 6/6: Verify + Feishu ──────────────────────────────────
 log_section "Stage 6/6: Verify"
 
-echo ""
-echo "Pods (bank-mall):"
-kubectl get pods -n bank-mall -o wide
+if $HAVE_KUBECTL; then
+  echo ""
+  echo "Pods (bank-mall):"
+  kubectl get pods -n bank-mall -o wide
 
-echo ""
-echo "Pods (jaeger):"
-kubectl get pods -n jaeger -o wide 2>/dev/null || echo "(jaeger namespace not found)"
+  echo ""
+  echo "Pods (jaeger):"
+  kubectl get pods -n jaeger -o wide 2>/dev/null || echo "(jaeger namespace not found)"
 
-echo ""
-bash "${ROOT_DIR}/scripts/smoke-test.sh"
+  echo ""
+  bash "${ROOT_DIR}/scripts/smoke-test.sh"
+else
+  echo "[INFO] Skipping cluster verification — kubectl not available on this node"
+  echo "  Deploy from master01: cd ~/bank-mall-platform && bash scripts/deploy.sh"
+fi
 
 # ── Feishu Notification ─────────────────────────────────────────
 FEISHU_WEBHOOK="${FEISHU_WEBHOOK:-}"

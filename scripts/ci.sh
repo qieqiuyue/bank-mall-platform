@@ -94,8 +94,8 @@ if command -v trivy >/dev/null 2>&1; then
     echo "[INFO] Java DB not cached — skipping (NJU mirror unavailable, vuln DB alone sufficient)"
   fi
 
-  # docker save to temp file — bypasses snap sandbox + Harbor HTTP auth
-  SCAN_TAR=$(mktemp /tmp/trivy-scan-XXXXXX.tar)
+  # docker save to temp file in $HOME — snap sandbox isolates /tmp but allows $HOME
+  SCAN_TAR=$(mktemp ${HOME}/trivy-scan-XXXXXX.tar)
   trap "rm -f ${SCAN_TAR}" EXIT
   for service in "${SERVICES[@]}"; do
     image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"

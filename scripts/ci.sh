@@ -85,13 +85,10 @@ if command -v trivy >/dev/null 2>&1; then
     echo "[INFO] Vuln DB → NJU mirror (${TRIVY_DB_REPO})"
   fi
 
-  # Java DB: NJU mirror does NOT have trivy-java-db (falls back to ghcr.io slow).
-  # Skip if not cached — vuln DB alone covers most CVEs for HIGH/CRITICAL gate.
+  # Java DB: let trivy manage — ghcr.io direct works at 12 MiB/s for this
   if [[ -f "${TRIVY_CACHE_DIR}/java-db/metadata.json" ]]; then
     DB_FLAGS="${DB_FLAGS} --skip-java-db-update"
     echo "[INFO] Java DB cached — skip update"
-  else
-    echo "[INFO] Java DB not cached — skipping (NJU mirror unavailable, vuln DB alone sufficient)"
   fi
 
   # docker save to temp file in $HOME — snap sandbox isolates /tmp but allows $HOME

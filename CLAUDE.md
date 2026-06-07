@@ -49,7 +49,7 @@ All services → Jaeger (OTLP gRPC 4317 / HTTP 4318)
 
 ## Network Constraints (GFW)
 
-- `ghcr.io` and `docker.io` blocked — use `ghcr.nju.edu.cn` mirror for container images. Note: trivy-db is an OCI artifact (NOT a container image); NJU mirror won't cache it. Pre-cache once (`trivy image --download-db-only && trivy image --download-java-db-only`, ~30 min total), then ci.sh uses `--skip-db-update --skip-java-db-update --offline-scan` (zero network, instant).
+- `ghcr.io` and `docker.io` blocked — use `ghcr.nju.edu.cn` mirror for all GHCR images and OCI artifacts (包括 trivy-db, 8 MiB/s vs GFW 直连 7 KiB/s)
 - `objects.githubusercontent.com` blocked — download binaries on Windows, scp to VM
 - Harbor runs HTTP-only on `10.0.0.61` — `insecure-registries` must be in `/etc/docker/daemon.json`
 - containerd v2 uses `hosts.toml` at `/etc/containerd/certs.d/10.0.0.61/` (NOT the old `plugins."io.containerd.grpc.v1.cri"` path)

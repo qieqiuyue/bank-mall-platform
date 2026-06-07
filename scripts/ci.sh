@@ -65,56 +65,43 @@ done
 # ── Stage 4/6: Trivy Scan (soft gate) ───────────────────────────
 log_section "Stage 4/6: Trivy Scan (soft gate — records, does not block)"
 
-# trivy-db is an OCI artifact (NOT a container image).
-# Hosted on ghcr.io/aquasecurity/trivy-db — GFW throttles to 30-50 KiB/s.
-# One-time cost: first download caches DB to ~/.cache/trivy/db/ (2 files: metadata.json + trivy.db).
-# After that, --skip-db-update + --offline-scan makes all scans instant (zero network, GFW-safe).
-#
-# Pre-cache (run once on harbor01, ~50 min over GFW — MUST set --timeout):
-#   trivy image --download-db-only --timeout 120m       # ~95 MiB, vulnerability DB
-#   trivy image --download-java-db-only --timeout 30m   # Java-specific DB
+# trivy-db on ghcr.io: GFW direct 7 KiB/s (~3h), NJU mirror 8 MiB/s (~12s).
+# Cached → skip update (instant). Not cached → NJU mirror (fast).
+# Ref: https://juejin.cn/post/7553890842093535286
 
+TRIVY_DB_REPO="${TRIVY_DB_REPO:-ghcr.nju.edu.cn/aquasecurity/trivy-db}"
+TRIVY_JAVA_DB_REPO="${TRIVY_JAVA_DB_REPO:-ghcr.nju.edu.cn/aquasecurity/trivy-java-db}"
 TRIVY_CACHE_DIR="${TRIVY_CACHE_DIR:-${HOME}/.cache/trivy}"
 
 if command -v trivy >/dev/null 2>&1; then
-  DB_OK=true
+  echo "[INFO] Trivy $(trivy -v 2>/dev/null | head -1)"
+
+  # Use --skip-*-update if DB already cached (instant), else download via NJU mirror
   DB_FLAGS=""
-
-  # Check vulnerability DB (required)
-  if [[ -f "${TRIVY_CACHE_DIR}/db/metadata.json" ]] && [[ -f "${TRIVY_CACHE_DIR}/db/trivy.db" ]]; then
+  if [[ -f "${TRIVY_CACHE_DIR}/db/metadata.json" ]]; then
     DB_FLAGS="--skip-db-update"
+    echo "[INFO] Vuln DB cached — skip update"
   else
-    echo "[WARN] Vulnerability DB not cached — $(du -sh ${TRIVY_CACHE_DIR}/db 2>/dev/null || echo '0 bytes')"
-    DB_OK=false
+    DB_FLAGS="--db-repository ${TRIVY_DB_REPO}"
+    echo "[INFO] Vuln DB → NJU mirror (${TRIVY_DB_REPO})"
   fi
 
-  # Check Java DB (for Spring Boot apps)
-  if [[ -f "${TRIVY_CACHE_DIR}/java-db/metadata.json" ]] && [[ -f "${TRIVY_CACHE_DIR}/java-db/trivy-java.db" ]]; then
+  if [[ -f "${TRIVY_CACHE_DIR}/java-db/metadata.json" ]]; then
     DB_FLAGS="${DB_FLAGS} --skip-java-db-update"
+    echo "[INFO] Java DB cached — skip update"
   else
-    echo "[WARN] Java DB not cached — $(du -sh ${TRIVY_CACHE_DIR}/java-db 2>/dev/null || echo '0 bytes')"
+    DB_FLAGS="${DB_FLAGS} --java-db-repository ${TRIVY_JAVA_DB_REPO}"
+    echo "[INFO] Java DB → NJU mirror (${TRIVY_JAVA_DB_REPO})"
   fi
 
-  if $DB_OK; then
-    DB_FLAGS="${DB_FLAGS} --offline-scan"
-    echo "[INFO] Trivy DBs ready — offline scan (GFW-safe, zero network)"
-    for service in "${SERVICES[@]}"; do
-      image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
-      echo "Scanning ${image}..."
-      trivy image ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 "${image}" 2>&1 || true
-    done
-  else
-    echo "[WARN] Trivy DB not fully cached — skipping scan"
-    echo "  Pre-cache once (MUST set --timeout for GFW):"
-    echo "    trivy image --download-db-only --timeout 120m"
-    echo "    trivy image --download-java-db-only --timeout 30m"
-  fi
+  for service in "${SERVICES[@]}"; do
+    image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
+    echo "Scanning ${image}..."
+    trivy image ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 "${image}" 2>&1 || true
+  done
 else
   echo "[WARN] Trivy not installed — skipping scan"
   echo "  Install: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh"
-  echo "  Pre-cache DB (one-time, MUST use --timeout):"
-  echo "    trivy image --download-db-only --timeout 120m"
-  echo "    trivy image --download-java-db-only --timeout 30m"
 fi
 
 # ── Stage 5/6: Deploy (GitOps via ArgoCD) ───────────────────────

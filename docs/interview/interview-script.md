@@ -29,7 +29,7 @@
 
 ### 技术架构（1 分钟）
 
-> 技术选型上，后端使用 Spring Boot 3.1.3 + Java 17，容器运行时选择 containerd（因为 K8s 1.24+ 已移除 Dockershim），CNI 使用 Calico（支持 NetworkPolicy），镜像仓库使用 Harbor。
+> 技术选型上，后端使用 Spring Boot 4.0.6 + Java 21，容器运行时选择 containerd（K8s 1.36），CNI 使用 Calico（支持 NetworkPolicy），镜像仓库使用 Harbor。
 >
 > 集群拓扑是 1 个 master + 2 个 worker，操作系统 Ubuntu 24.04，虚拟化使用 VMware NAT 网络。
 >

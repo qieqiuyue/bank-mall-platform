@@ -258,7 +258,7 @@ spec:
 
 **优化方案：**
 1. 使用 Spring Boot AOT + GraalVM Native Image（启动时间 < 1s，但镜像构建复杂）
-2. 使用 Spring Boot 3.x 的 CRaC（Coordinated Restore at Checkpoint）特性
+2. 使用 Spring Boot 4.x 的 CRaC（Coordinated Restore at Checkpoint）特性
 3. 精简依赖：移除未使用的 Starter，减少 Bean 扫描范围
 4. 调整 JVM 参数：`-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0`
 

@@ -72,7 +72,7 @@ docs/s5-interview-prep
 ## 代码风格
 
 ### Java
-- Java 17，Spring Boot 3.2+
+- Java 21，Spring Boot 4.0.6
 - HTTP 客户端：RestClient（禁止 RestTemplate/WebClient 同步调用）
 - 测试：JUnit 5
 - 数据库迁移：Flyway

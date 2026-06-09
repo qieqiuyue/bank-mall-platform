@@ -34,7 +34,7 @@ Spring Boot、Docker、Kubernetes、containerd、Harbor、Ingress Nginx、Config
 
 - 生产环境补齐 Harbor 镜像安全扫描、镜像签名和更严格的凭据管理。
 - 生产环境使用 nodeAffinity、StorageClass 和多副本替代实验环境中的固定 `nodeName` 与 hostPath。
-- 设计分布式链路追踪方案（OpenTelemetry + Jaeger），定位跨服务调用延迟；当前未部署。
+- 落地分布式链路追踪方案（OpenTelemetry + Jaeger），定位跨服务调用延迟。
 - 规划 Redis 缓存与 AlertManager HA，分别用于热点数据和多集群告警治理。
 - 规划 CI/CD 流水线，实现代码提交到生产部署的自动化。
 

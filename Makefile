@@ -56,7 +56,7 @@ clean:
 	done
 
 push:
-	bash scripts/build-images.sh
+	PUSH=true bash scripts/build-images.sh
 
 preflight:
 	bash scripts/preflight.sh
@@ -66,6 +66,9 @@ deploy:
 
 smoke-test:
 	bash scripts/smoke-test.sh
+
+verify:
+	bash scripts/verify.sh
 
 ci:
 	bash scripts/ci.sh

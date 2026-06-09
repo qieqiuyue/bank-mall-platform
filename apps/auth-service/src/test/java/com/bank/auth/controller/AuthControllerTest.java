@@ -5,7 +5,6 @@ import com.bank.auth.repository.UserRepository;
 import com.bank.auth.service.LoginRateLimiter;
 import com.bank.auth.util.JwtUtil;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.impl.DefaultClaims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -91,8 +90,8 @@ class AuthControllerTest {
         User user = new User("admin", "pass", "U1001", "Demo User", "GOLD", "LOW", "CUSTOMER");
         when(userRepository.findByUserId("U1001")).thenReturn(Optional.of(user));
 
-        Claims claims = new DefaultClaims();
-        claims.setSubject("U1001");
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("U1001");
         when(jwtUtil.validateToken("test-token")).thenReturn(claims);
 
         mvc.perform(get("/api/auth/users/U1001")
@@ -106,8 +105,8 @@ class AuthControllerTest {
     void userProfile_notFound() throws Exception {
         when(userRepository.findByUserId("GHOST")).thenReturn(Optional.empty());
 
-        Claims claims = new DefaultClaims();
-        claims.setSubject("GHOST");
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("GHOST");
         when(jwtUtil.validateToken("test-token")).thenReturn(claims);
 
         mvc.perform(get("/api/auth/users/GHOST")

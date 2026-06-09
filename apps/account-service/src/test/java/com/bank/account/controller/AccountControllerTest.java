@@ -8,8 +8,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
-import java.util.List;
+import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -41,9 +45,10 @@ class AccountControllerTest {
 
     @Test
     void getTransactions_success() throws Exception {
-        when(accountService.getTransactions("A1001")).thenReturn(List.of());
+        Page<TransactionResponse> emptyPage = new PageImpl<>(Collections.emptyList());
+        when(accountService.getTransactions(eq("A1001"), any(Pageable.class))).thenReturn(emptyPage);
 
-        mvc.perform(get("/api/accounts/A1001/transactions"))
+        mvc.perform(get("/api/accounts/A1001/transactions?page=0&size=20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("SUCCESS"));
     }

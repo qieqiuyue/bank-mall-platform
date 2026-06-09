@@ -43,8 +43,10 @@ public class LoginRateLimiter {
         store.remove(clientIp);
     }
 
-    private record Window(int count) {
-        Instant firstSeen = Instant.now();
+    private static class Window {
+        final int count;
+        final Instant firstSeen = Instant.now();
+        Window(int count) { this.count = count; }
         boolean isExpired(long windowSeconds) {
             return firstSeen.plusSeconds(windowSeconds).isBefore(Instant.now());
         }

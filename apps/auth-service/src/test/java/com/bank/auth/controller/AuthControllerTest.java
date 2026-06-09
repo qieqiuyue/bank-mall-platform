@@ -2,7 +2,9 @@ package com.bank.auth.controller;
 
 import com.bank.auth.entity.User;
 import com.bank.auth.repository.UserRepository;
+import com.bank.auth.service.LoginRateLimiter;
 import com.bank.auth.util.JwtUtil;
+import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -13,6 +15,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -24,15 +27,18 @@ class AuthControllerTest {
     private UserRepository userRepository;
     private BCryptPasswordEncoder passwordEncoder;
     private JwtUtil jwtUtil;
+    private LoginRateLimiter rateLimiter;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
         passwordEncoder = mock(BCryptPasswordEncoder.class);
         jwtUtil = mock(JwtUtil.class);
+        rateLimiter = mock(LoginRateLimiter.class);
+        when(rateLimiter.allow(anyString())).thenReturn(true);
         com.bank.auth.metrics.AuthMetrics metrics = mock(com.bank.auth.metrics.AuthMetrics.class);
         mvc = MockMvcBuilders.standaloneSetup(
-                new AuthController(userRepository, passwordEncoder, jwtUtil, metrics)).build();
+                new AuthController(userRepository, passwordEncoder, jwtUtil, metrics, rateLimiter)).build();
     }
 
     @Test
@@ -84,7 +90,12 @@ class AuthControllerTest {
         User user = new User("admin", "pass", "U1001", "Demo User", "GOLD", "LOW", "CUSTOMER");
         when(userRepository.findByUserId("U1001")).thenReturn(Optional.of(user));
 
-        mvc.perform(get("/api/auth/users/U1001"))
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("U1001");
+        when(jwtUtil.validateToken("test-token")).thenReturn(claims);
+
+        mvc.perform(get("/api/auth/users/U1001")
+                        .header("Authorization", "Bearer test-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.name").value("Demo User"));
@@ -94,7 +105,12 @@ class AuthControllerTest {
     void userProfile_notFound() throws Exception {
         when(userRepository.findByUserId("GHOST")).thenReturn(Optional.empty());
 
-        mvc.perform(get("/api/auth/users/GHOST"))
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("GHOST");
+        when(jwtUtil.validateToken("test-token")).thenReturn(claims);
+
+        mvc.perform(get("/api/auth/users/GHOST")
+                        .header("Authorization", "Bearer test-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }

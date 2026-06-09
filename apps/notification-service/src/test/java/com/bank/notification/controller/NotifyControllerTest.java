@@ -32,7 +32,7 @@ class NotifyControllerTest {
         when(service.send(any())).thenReturn(null);
         mvc.perform(post("/api/notifications")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"accountNo\":\"A1001\",\"channel\":\"SMS\",\"template\":\"PAYMENT_SUCCESS\"}"))
+                        .content("{\"accountNo\":\"A1001\",\"channel\":\"SMS\",\"template\":\"PAYMENT_SUCCESS\",\"content\":\"test message\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("SUCCESS"));
     }

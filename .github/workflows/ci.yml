@@ -55,6 +55,7 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         cache: 'maven'
+    - run: cd apps/common-lib && mvn install -DskipTests -q
     - run: cd apps/${{ matrix.service }} && mvn test -q
 
   # ── Job 4: Build + Trivy scan (main only, hard gate) ──────────
@@ -72,6 +73,7 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         cache: 'maven'
+    - run: cd apps/common-lib && mvn install -DskipTests -q
     - run: cd apps/${{ matrix.service }} && mvn package -DskipTests -q
     - uses: docker/setup-buildx-action@v3
     - uses: docker/build-push-action@v5

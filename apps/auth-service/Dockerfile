@@ -6,7 +6,7 @@ COPY common-lib/src common-lib/src
 COPY auth-service/pom.xml auth-service/
 COPY auth-service/settings.xml /root/.m2/settings.xml
 COPY auth-service/src auth-service/src
-RUN mvn install -pl common-lib -am -DskipTests -q && cd auth-service && mvn clean package -DskipTests -q
+RUN mvn install -N -DskipTests -q && mvn install -pl common-lib -DskipTests -q && cd auth-service && mvn clean package -DskipTests -q
 
 FROM eclipse-temurin:21-alpine
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

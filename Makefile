@@ -56,7 +56,7 @@ clean:
 	done
 
 push:
-	bash scripts/build-images.sh
+	PUSH=true bash scripts/build-images.sh
 
 preflight:
 	bash scripts/preflight.sh

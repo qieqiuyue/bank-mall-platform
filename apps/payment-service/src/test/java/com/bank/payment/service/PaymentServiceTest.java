@@ -78,7 +78,7 @@ class PaymentServiceTest {
         when(accountClient.debit(eq("A1001"), any(), eq("KEY-002"))).thenReturn(mockData);
         when(accountClient.credit(eq("MALL-SETTLEMENT"), any(), eq("KEY-002")))
                 .thenThrow(new BusinessException(
-                        com.bank.payment.exception.ErrorCode.ACCOUNT_SERVICE_UNAVAILABLE, "Credit failed"));
+                        com.bank.common.exception.ErrorCode.ACCOUNT_SERVICE_UNAVAILABLE, "Credit failed"));
         when(accountClient.reverse(eq("A1001"), eq("debit-KEY-002"), eq("KEY-002")))
                 .thenReturn(mockData);
 
@@ -147,7 +147,7 @@ class PaymentServiceTest {
         when(paymentRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(accountClient.debit(any(), any(), any()))
                 .thenThrow(new BusinessException(
-                        com.bank.payment.exception.ErrorCode.ACCOUNT_SERVICE_UNAVAILABLE,
+                        com.bank.common.exception.ErrorCode.ACCOUNT_SERVICE_UNAVAILABLE,
                         "Cannot reach account-service"));
 
         PaymentResponse resp = paymentService.processPayment(req("KEY-006"));
@@ -184,7 +184,7 @@ class PaymentServiceTest {
         when(paymentRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(accountClient.debit(eq("NONEXISTENT"), any(), any()))
                 .thenThrow(new BusinessException(
-                        com.bank.payment.exception.ErrorCode.INVALID_REQUEST,
+                        com.bank.common.exception.ErrorCode.INVALID_REQUEST,
                         "Account NONEXISTENT not found"));
 
         PaymentRequest r = req("KEY-008");

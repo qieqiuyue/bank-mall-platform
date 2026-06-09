@@ -1,10 +1,14 @@
 package com.bank.notification.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class NotificationRequest {
+    @NotBlank(message = "accountNo is required")
     private String accountNo;
     private String channel;
     private String template;
     private String title;
+    @NotBlank(message = "content is required")
     private String content;
 
     public String getAccountNo() { return accountNo; }

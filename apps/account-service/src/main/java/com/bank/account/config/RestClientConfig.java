@@ -12,7 +12,12 @@ public class RestClientConfig {
 
     @Bean
     RestClient restClient() {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(2));
+        factory.setReadTimeout(java.time.Duration.ofSeconds(5));
+
         return RestClient.builder()
+                .requestFactory(factory)
                 .defaultHeader("X-Service-Name", "account-service")
                 .build();
     }

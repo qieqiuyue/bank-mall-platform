@@ -1,11 +1,17 @@
 package com.bank.account.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 
 public class DebitRequest {
+    @NotNull(message = "amount is required")
+    @Positive(message = "amount must be positive")
     private BigDecimal amount;
     private String referenceType;
     private String referenceId;
+    @NotBlank(message = "idempotencyKey is required")
     private String idempotencyKey;
 
     public BigDecimal getAmount() { return amount; }

@@ -8,8 +8,8 @@ import com.bank.payment.dto.PaymentRequest;
 import com.bank.payment.dto.PaymentResponse;
 import com.bank.payment.entity.Payment;
 import com.bank.payment.entity.PaymentTransaction;
-import com.bank.payment.exception.BusinessException;
-import com.bank.payment.exception.ErrorCode;
+import com.bank.common.exception.BusinessException;
+import com.bank.common.exception.ErrorCode;
 import com.bank.payment.repository.PaymentRepository;
 import com.bank.payment.repository.PaymentTransactionRepository;
 import org.slf4j.Logger;
@@ -104,9 +104,9 @@ public class PaymentService {
         } catch (Exception e) {
             if (hasDebit) {
                 // Compensation: debit succeeded but credit failed → reverse the debit
-                boolean reversed = reverseWithRetry(req.getPayerAccount(), req.getAmount(), idempotencyKey);
-                if (reversed) {
-                    saveTxn(payment, null, "ACCOUNT", "REVERSAL", "SUCCESS");
+                AccountServiceResponse.TransactionData revResp = reverseWithRetry(req.getPayerAccount(), req.getAmount(), idempotencyKey);
+                if (revResp != null) {
+                    saveTxn(payment, revResp.getTransactionNo(), "ACCOUNT", "REVERSAL", "SUCCESS");
                     payment.setStatus("FAILED");
                     payment.setFailReason("Credit to " + payeeAccount + " failed. Reversal successful. "
                             + "Original error: " + e.getMessage());
@@ -138,25 +138,28 @@ public class PaymentService {
         return PaymentResponse.from(payment);
     }
 
-    /** Manual 3-retry loop — no spring-retry dependency. */
-    private boolean reverseWithRetry(String accountNo, BigDecimal amount, String idempotencyKey) {
+    /** Manual 3-retry loop with exponential backoff — no spring-retry dependency. Returns TransactionData on success, null on exhaustion. */
+    private AccountServiceResponse.TransactionData reverseWithRetry(String accountNo, BigDecimal amount, String idempotencyKey) {
         for (int attempt = 0; attempt < MAX_REVERSE_RETRY; attempt++) {
             try {
                 AccountServiceResponse.TransactionData revResp = accountClient.reverse(
                         accountNo, "debit-" + idempotencyKey, idempotencyKey);
                 log.info("Reverse attempt {}/{} succeeded: txn={}", attempt + 1, MAX_REVERSE_RETRY,
                         revResp.getTransactionNo());
-                return true;
+                return revResp;
             } catch (Exception e) {
                 if (attempt == MAX_REVERSE_RETRY - 1) {
                     log.error("Reverse exhausted after {} attempts for account {}",
                             MAX_REVERSE_RETRY, accountNo, e);
-                    return false;
+                    return null;
                 }
-                log.warn("Reverse attempt {}/{} failed, retrying...", attempt + 1, MAX_REVERSE_RETRY);
+                // Exponential backoff: 50ms, 200ms, 800ms
+                long backoffMs = (long) (50 * Math.pow(4, attempt));
+                log.warn("Reverse attempt {}/{} failed, retrying in {}ms...", attempt + 1, MAX_REVERSE_RETRY, backoffMs);
+                try { Thread.sleep(backoffMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return null; }
             }
         }
-        return false;
+        return null;
     }
 
     private void saveTxn(Payment payment, String transactionNo, String serviceName,

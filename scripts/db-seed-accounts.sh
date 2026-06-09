@@ -34,7 +34,7 @@ log_pass "MySQL password retrieved"
 
 # Verify MySQL is reachable
 log_info "Verifying MySQL connectivity..."
-if ! kubectl exec "deploy/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- mysql -uroot -p"${MYSQL_PASS}" -e "SELECT 1" &>/dev/null; then
+if ! kubectl exec "statefulset/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- env MYSQL_PWD="${MYSQL_PASS}" mysql -uroot -e "SELECT 1" &>/dev/null; then
   log_fail "Cannot connect to MySQL pod"
   exit 1
 fi
@@ -49,7 +49,7 @@ SKIPPED=0
 for i in $(seq 2 10); do
   ACCOUNT_NO="USER$(printf '%03d' $i)"
 
-  RESULT=$(kubectl exec "deploy/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- mysql -uroot -p"${MYSQL_PASS}" bank_account -sN -e \
+  RESULT=$(kubectl exec "statefulset/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- env MYSQL_PWD="${MYSQL_PASS}" mysql -uroot bank_account -sN -e \
     "INSERT INTO accounts (account_no, user_id, account_type, status, balance, version, created_at, updated_at)
      VALUES ('${ACCOUNT_NO}', '${ACCOUNT_NO}', 'SAVINGS', 'ACTIVE', 100000.00, 0, NOW(), NOW())
      ON DUPLICATE KEY UPDATE balance = 100000.00, version = 0;
@@ -74,7 +74,7 @@ echo "Updated:  ${SKIPPED}"
 # Verify final account list
 echo ""
 log_info "Current accounts in bank_account.accounts:"
-kubectl exec "deploy/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- mysql -uroot -p"${MYSQL_PASS}" bank_account -e \
+kubectl exec "statefulset/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- env MYSQL_PWD="${MYSQL_PASS}" mysql -uroot bank_account -e \
   "SELECT account_no, balance, status FROM accounts ORDER BY account_no;"
 
 echo ""

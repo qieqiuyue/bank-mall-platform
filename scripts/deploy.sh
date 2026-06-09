@@ -11,8 +11,8 @@ kubectl apply -f "${K8S_BASE}/security/namespace-psa.yaml"
 kubectl label namespace ingress-nginx name=ingress-nginx --overwrite 2>/dev/null || true
 kubectl label namespace monitoring name=monitoring --overwrite 2>/dev/null || true
 
-echo "[1/12] Creating Secrets..."
-kubectl apply -f "${K8S_BASE}/secret.yaml"
+echo "[1/12] Applying Sealed Secrets..."
+kubectl apply -f "${K8S_BASE}/sealed-bank-mall.yaml"
 kubectl apply -f "${K8S_BASE}/mysql/secret.yaml"
 
 echo "[2/12] Deploying MySQL (storage + deployment)..."

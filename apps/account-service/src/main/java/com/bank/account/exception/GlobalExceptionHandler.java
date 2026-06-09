@@ -1,6 +1,6 @@
 package com.bank.account.exception;
 
-import com.bank.account.api.ApiResponse;
+import com.bank.common.api.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;

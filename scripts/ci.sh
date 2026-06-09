@@ -98,7 +98,7 @@ if command -v trivy >/dev/null 2>&1; then
     image="${REGISTRY}/${NAMESPACE}/${service}:${VERSION}"
     echo "Scanning ${image}..."
     docker save "${image}" -o "${SCAN_TAR}"
-    trivy image --input "${SCAN_TAR}" ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 0 2>&1 || true
+    trivy image --input "${SCAN_TAR}" ${DB_FLAGS} --severity HIGH,CRITICAL --exit-code 1 2>&1 || true
   done
 else
   echo "[WARN] Trivy not installed — skipping scan"

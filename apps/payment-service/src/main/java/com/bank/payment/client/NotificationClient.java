@@ -1,5 +1,7 @@
 package com.bank.payment.client;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,12 +20,18 @@ public class NotificationClient {
 
     private final RestClient restClient;
     private final String notificationUrl;
+    private final Counter failureCounter;
 
     public NotificationClient(RestClient restClient,
                               @Value("${bank.services.notification-url:http://notification-service:8084}")
-                              String notificationUrl) {
+                              String notificationUrl,
+                              MeterRegistry meterRegistry) {
         this.restClient = restClient;
         this.notificationUrl = notificationUrl;
+        this.failureCounter = Counter.builder("notification.send.failures")
+                .description("Number of failed notification send attempts")
+                .tag("service", "payment-service")
+                .register(meterRegistry);
     }
 
     public void send(String accountNo, String template, String content) {
@@ -41,6 +49,7 @@ public class NotificationClient {
                     .toBodilessEntity();
             log.info("Notification sent to {} template={}", accountNo, template);
         } catch (Exception e) {
+            failureCounter.increment();
             log.warn("Notification failed (non-blocking): {} template={}", accountNo, template, e);
         }
     }

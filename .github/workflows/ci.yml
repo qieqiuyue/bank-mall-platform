@@ -78,7 +78,7 @@ jobs:
       with:
         context: apps
         file: apps/${{ matrix.service }}/Dockerfile
-        push: false
+        push: true
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ env.VERSION }}
         load: true
     - uses: aquasecurity/trivy-action@master

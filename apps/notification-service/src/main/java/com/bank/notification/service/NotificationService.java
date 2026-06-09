@@ -8,8 +8,8 @@ import com.bank.notification.repository.NotificationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class NotificationService {
@@ -35,8 +35,8 @@ public class NotificationService {
         return NotificationResponse.from(n);
     }
 
-    public List<NotificationResponse> getByAccount(String accountNo) {
-        return repo.findByAccountNoOrderByCreatedAtDesc(accountNo)
-                .stream().map(NotificationResponse::from).collect(Collectors.toList());
+    public Page<NotificationResponse> getByAccount(String accountNo, Pageable pageable) {
+        return repo.findByAccountNoOrderByCreatedAtDesc(accountNo, pageable)
+                .map(NotificationResponse::from);
     }
 }

@@ -6,7 +6,7 @@ COPY common-lib/src common-lib/src
 COPY account-service/pom.xml account-service/
 COPY account-service/settings.xml /root/.m2/settings.xml
 COPY account-service/src account-service/src
-RUN mvn install -pl common-lib -am -DskipTests -q && cd account-service && mvn clean package -DskipTests -q
+RUN mvn install -N -DskipTests -q && mvn install -pl common-lib -DskipTests -q && cd account-service && mvn clean package -DskipTests -q
 
 FROM eclipse-temurin:21-alpine
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

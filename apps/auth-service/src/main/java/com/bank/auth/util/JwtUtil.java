@@ -6,6 +6,9 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -20,12 +23,30 @@ import java.util.List;
  */
 @Component
 public class JwtUtil {
+    private static final Logger log = LoggerFactory.getLogger(JwtUtil.class);
 
     @Value("${jwt.secret}")
     private String secret;
 
     @Value("${jwt.expiration:24}")
     private long expirationHours;
+
+    @PostConstruct
+    void validateSecret() {
+        if (secret == null || secret.isBlank() || secret.startsWith("${")) {
+            throw new IllegalStateException(
+                    "JWT_SECRET_KEY must be set (not default/placeholder). Generate with: openssl rand -base64 32");
+        }
+        try {
+            byte[] keyBytes = Decoders.BASE64.decode(secret);
+            if (keyBytes.length < 32) {
+                throw new IllegalStateException("JWT secret must decode to at least 32 bytes (256 bits)");
+            }
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("JWT_SECRET_KEY is not valid Base64: " + e.getMessage());
+        }
+        log.info("JWT signing key validated ({} bytes)", Decoders.BASE64.decode(secret).length);
+    }
 
     private SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secret);

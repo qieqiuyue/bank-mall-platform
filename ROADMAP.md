@@ -81,7 +81,55 @@
 - [ ] High-availability architecture design document
 - [ ] Redis idempotency design document
 
+### S5.5：Audit Remediation ✅ Complete（2026-06-09）
+
+> 五轮交叉验证审计（Claude + Kimi + 架构师 + GLM-5.1）+ 主审架构师灾难预演 → 修复 28/31 P0、26/31 P1、2/10 P2
+
+- [x] common-lib 共享模块 — 统一 ApiResponse / ErrorCode / BusinessException
+- [x] JWT 密钥默认值移除 + 启动校验
+- [x] auth GlobalExceptionHandler 补齐
+- [x] DataInitializer 全部 `@Profile("dev")` 隔离
+- [x] auth-service ddl-auto: update → validate + Flyway V1 迁移
+- [x] MySQL Deployment → StatefulSet（含 serviceName）
+- [x] 4 服务 replicas: 2 + HPA minReplicas: 2 + PDB 生效
+- [x] K8s 探针全部改 Actuator /actuator/health/liveness + /readiness
+- [x] Docker HEALTHCHECK 与 K8s 探针对齐
+- [x] deploy.sh 修复（SealedSecret 替代不存在的 secret.yaml）
+- [x] Cloud overlay ACR 凭据移除
+- [x] Prometheus emptyDir → PVC（10Gi）
+- [x] Grafana 匿名访问关闭 + 密码 SecretKeyRef
+- [x] Promtail cri:{} 移除
+- [x] ArgoCD exclude 语法修正（shell brace → gitignore glob）
+- [x] Trivy exit-code 统一（ci.sh --exit-code 1）
+- [x] 脚本执行权限恢复（chmod +x）
+- [x] db-backup / db-seed 密码走环境变量（MYSQL_PWD）
+- [x] RestClient 超时统一（connect 2s / read 5s）
+- [x] 乐观锁指数退避（20ms→80ms→320ms）+ 冲正退避
+- [x] Transaction ID 纳秒+随机后缀防碰撞
+- [x] legacyBalance 死代码删除
+- [x] Swagger 注解补全（account/payment/notification 控制器）
+- [x] Bean Validation 补全（4 个 DTO @Valid @NotBlank @NotNull @Positive）
+- [x] 补偿事务 reverseWithRetry 返回 TransactionData（修复 transactionNo=null）
+- [x] AuthController 登录速率限制（LoginRateLimiter: 60s/10 次）
+- [x] AuthController userProfile JWT subject 校验防越权
+- [x] NotificationClient Micrometer counter（notification.send.failures）
+- [x] Jaeger nodeName 硬编码移除
+- [x] Prometheus RBAC nodes/proxy 权限移除
+- [x] teardown.sh / preflight.sh 路径修正
+- [x] MySQL StatefulSet serviceName 补充
+- [x] 4 份项目文档更新/新建（troubleshooting + design-decisions + CONTRIBUTING + production-readiness-checklist）
+- [x] 第二轮修复（Jaeger PVC 持久化 + Ingress 拆分 + 分页 + DataInitializer 竞态防护 + Docker SHA）
+- [x] 最终审计报告定稿（AUDIT_FINAL.md — 30/35 清零 + ARCHITECT_ADVERSARIAL_AUDIT.md）
+
 ### S6：Bonus (Time Permitting) ⚪ Planned
+
+V2 范畴（从审计转入 — 见 AUDIT_FINAL.md 终版）：
+
+- [ ] **Spring Security 运行时认证** — 4 服务 API 加 JWT Filter Chain（原 P0 审计缺陷）
+- [ ] **Ingress host 规则** — 生产化域名绑定（原 P0 审计缺陷）
+- [ ] **common-web 安全模块** — SecurityHeadersFilter + CorrelationIdFilter（原 P1 审计缺陷）
+
+原 S6 计划：
 
 - [ ] Velero backup and restore demonstration
 - [ ] Argo Rollouts canary deployment

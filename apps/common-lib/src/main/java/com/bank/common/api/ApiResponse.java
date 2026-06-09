@@ -1,8 +1,8 @@
-package com.bank.notification.api;
+package com.bank.common.api;
 
 import java.time.Instant;
 
-/** NOTE: Duplicated across services. Keep in sync if changed. */
+/** Unified API response wrapper — single source of truth for all 4 services. */
 public class ApiResponse<T> {
     private final String code;
     private final String message;

@@ -25,6 +25,12 @@
   </properties>
 
   <dependencies>
+    <!-- Common lib -->
+    <dependency>
+      <groupId>com.bank</groupId>
+      <artifactId>common-lib</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- Spring Boot Web -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

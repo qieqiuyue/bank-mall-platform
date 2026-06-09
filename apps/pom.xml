@@ -85,6 +85,7 @@
   </pluginRepositories>
 
   <modules>
+    <module>common-lib</module>
     <module>auth-service</module>
     <module>account-service</module>
     <module>payment-service</module>

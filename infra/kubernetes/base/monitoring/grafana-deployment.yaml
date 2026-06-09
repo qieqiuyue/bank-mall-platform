@@ -36,9 +36,13 @@ spec:
         - name: GF_SECURITY_ADMIN_USER
           value: admin
         - name: GF_SECURITY_ADMIN_PASSWORD
-          value: <GRAFANA_PASSWORD>
+          valueFrom:
+            secretKeyRef:
+              name: bank-mall-secret
+              key: GRAFANA_ADMIN_PASSWORD
+              optional: true
         - name: GF_AUTH_ANONYMOUS_ENABLED
-          value: "true"
+          value: "false"
         - name: GF_USERS_DEFAULT_THEME
           value: "light"
         - name: GF_UNIFIED_ALERTING_ENABLED

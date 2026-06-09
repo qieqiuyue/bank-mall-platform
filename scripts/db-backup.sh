@@ -39,8 +39,8 @@ TIMESTAMP=$(date +%Y%m%d-%H%M)
 BACKUP_FILE="${BACKUP_DIR}/bank-mall-baseline-${TIMESTAMP}.sql"
 
 log_info "Running mysqldump --all-databases..."
-kubectl exec "deploy/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- \
-  mysqldump -uroot -p"${MYSQL_PASS}" --all-databases --single-transaction --routines --triggers \
+kubectl exec "statefulset/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- \
+  env MYSQL_PWD="${MYSQL_PASS}" mysqldump -uroot --all-databases --single-transaction --routines --triggers \
   > "${BACKUP_FILE}" 2>/dev/null
 
 # Verify backup
@@ -58,7 +58,7 @@ log_info "Size: ${BACKUP_SIZE} bytes (${BACKUP_SIZE_HUMAN})"
 # Show table row counts for reference
 echo ""
 log_info "Current row counts for reference:"
-kubectl exec "deploy/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- mysql -uroot -p"${MYSQL_PASS}" -sN -e \
+kubectl exec "statefulset/${MYSQL_DEPLOY}" -n "${NAMESPACE}" -- env MYSQL_PWD="${MYSQL_PASS}" mysql -uroot -sN -e \
   "SELECT CONCAT(table_schema, '.', table_name, ': ', table_rows)
    FROM information_schema.tables
    WHERE table_schema NOT IN ('mysql','information_schema','performance_schema','sys')

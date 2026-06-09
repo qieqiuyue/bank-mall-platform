@@ -1,8 +1,8 @@
 package com.bank.payment.client;
 
 import com.bank.payment.dto.AccountServiceResponse;
-import com.bank.payment.exception.BusinessException;
-import com.bank.payment.exception.ErrorCode;
+import com.bank.common.exception.BusinessException;
+import com.bank.common.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

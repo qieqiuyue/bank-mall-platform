@@ -25,6 +25,12 @@
   </properties>
 
   <dependencies>
+    <!-- Common lib -->
+    <dependency>
+      <groupId>com.bank</groupId>
+      <artifactId>common-lib</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>

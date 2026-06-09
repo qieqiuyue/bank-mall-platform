@@ -5,7 +5,7 @@ import com.bank.payment.dto.AccountServiceResponse;
 import com.bank.payment.dto.PaymentRequest;
 import com.bank.payment.dto.PaymentResponse;
 import com.bank.payment.entity.Payment;
-import com.bank.payment.exception.BusinessException;
+import com.bank.common.exception.BusinessException;
 import com.bank.payment.repository.PaymentRepository;
 import com.bank.payment.repository.PaymentTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;

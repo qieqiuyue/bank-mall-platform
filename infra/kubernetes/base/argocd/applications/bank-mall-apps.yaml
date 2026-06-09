@@ -12,7 +12,15 @@ spec:
     directory:
       recurse: true
       exclude: |
-        {argocd/,jaeger/,monitoring/,ingress/,security/,namespace.yaml,configmap.yaml,secret.yaml,hpa/}
+        argocd/
+        jaeger/
+        monitoring/
+        ingress/
+        security/
+        namespace.yaml
+        configmap.yaml
+        secret.yaml
+        hpa/
   destination:
     server: https://kubernetes.default.svc
     namespace: bank-mall
@@ -55,7 +63,12 @@ spec:
     path: infra/kubernetes/base
     directory:
       include: |
-        {ingress/,security/,namespace.yaml,configmap.yaml,secret.yaml,hpa/}
+        ingress/
+        security/
+        namespace.yaml
+        configmap.yaml
+        secret.yaml
+        hpa/
   destination:
     server: https://kubernetes.default.svc
     namespace: bank-mall

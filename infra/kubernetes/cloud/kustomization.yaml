@@ -14,18 +14,9 @@ configMapGenerator:
       - OTEL_EXPORTER_OTLP_PROTOCOL=""
       - OTEL_TRACES_EXPORTER="none"
 
-# Image registry override: Harbor (10.0.0.61) → ACR (Guangzhou personal instance)
-images:
-  - name: 10.0.0.61/bank-mall/auth-service
-    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-auth-service
-  - name: 10.0.0.61/bank-mall/account-service
-    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-account-service
-  - name: 10.0.0.61/bank-mall/payment-service
-    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-payment-service
-  - name: 10.0.0.61/bank-mall/notification-service
-    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-notification-service
-  - name: 10.0.0.61/bank-mall/otel-agent-init
-    newName: crpi-czgg1cl74ayotw3x.cn-guangzhou.personal.cr.aliyuncs.com/qqy_my_re/bank-mall-otel-agent-init
+# Image registry override: set CLOUD_REGISTRY env var or replace below
+# Example: newName: <your-registry>/bank-mall/auth-service
+images: []
 
 patches:
   # Ingress: NodePort → LoadBalancer (ACK auto-creates SLB)

@@ -9,6 +9,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -59,10 +62,11 @@ class NotificationServiceTest {
         n.setTitle("PAYMENT_SUCCESS");
         n.setContent("Paid");
         n.setStatus("SENT");
-        when(repo.findByAccountNoOrderByCreatedAtDesc("A1001")).thenReturn(List.of(n));
+        Page<Notification> page = new PageImpl<>(List.of(n));
+        when(repo.findByAccountNoOrderByCreatedAtDesc(eq("A1001"), any(Pageable.class))).thenReturn(page);
 
-        List<NotificationResponse> list = service.getByAccount("A1001");
-        assertEquals(1, list.size());
-        assertEquals("A1001", list.get(0).getAccountNo());
+        Page<NotificationResponse> result = service.getByAccount("A1001", Pageable.ofSize(20));
+        assertEquals(1, result.getTotalElements());
+        assertEquals("A1001", result.getContent().get(0).getAccountNo());
     }
 }

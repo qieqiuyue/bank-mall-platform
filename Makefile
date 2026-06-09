@@ -67,6 +67,9 @@ deploy:
 smoke-test:
 	bash scripts/smoke-test.sh
 
+verify:
+	bash scripts/verify.sh
+
 ci:
 	bash scripts/ci.sh
 

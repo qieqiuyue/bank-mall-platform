@@ -394,3 +394,64 @@ containers:
 ---
 
 > 本文档持续更新。每次重大技术决策或踩坑解决后，追加到对应章节。
+
+---
+
+## 十、RestClient 超时策略（2026-06-09 审计修复）
+
+### 背景
+
+4 个服务的 `RestClientConfig` 超时配置不一致：payment 设置了 2s/3s，auth 和 account 完全未设置（无穷大）。两轮审计均指出"一个慢服务拖垮所有调用方"的级联雪崩风险。
+
+### 决策
+
+所有服务的 RestClient 统一配置超时：**connect 2s / read 5s**。
+
+| 服务 | connect | read | 理由 |
+|------|---------|------|------|
+| payment-service | 2s | 3s → **5s** | 调用 account（业务逻辑可能慢）+ notification |
+| auth-service | ∞ → **2s** | ∞ → **5s** | 无跨服务调用，但防御性配置 |
+| account-service | ∞ → **2s** | ∞ → **5s** | 防御性配置 |
+
+### 反例
+
+`SimpleClientHttpRequestFactory` 默认 connect/read 均为无穷大。在以下场景触发雪崩：
+- account-service GC 停顿 10 秒 → payment 所有请求阻塞 → Tomcat worker 线程池耗尽 → payment 拒绝新请求
+- 网络分区但 TCP 未断 → read 永不超时 → 连接泄漏
+
+### 面试话术
+
+> "跨服务 HTTP 调用的超时采用洋葱模型：单次调用超时 < 调用方自身处理超时 < 网关总超时。connect 2 秒确保不阻塞在 TCP 握手，read 5 秒给足业务处理时间但不让调用方无限等待。"
+
+---
+
+## 十一、Jaeger ExternalName Service 跨命名空间路由（2026-06-09）
+
+### 背景
+
+Jaeger 部署在独立 `jaeger` namespace，Ingress 规则在 `bank-mall` namespace。原始审计诊断为 Service 名错误，但深入分析后发现 **ExternalName Service 是正确的设计**，真正问题是 Ingress rewrite-target 与 QUERY_BASE_PATH 冲突。
+
+### 决策
+
+使用 `ExternalName` Service 实现跨命名空间引用：
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-ui          # 在 bank-mall namespace
+  namespace: bank-mall
+spec:
+  type: ExternalName
+  externalName: jaeger-query.jaeger.svc.cluster.local
+```
+
+Ingress 后端指向 `jaeger-ui.bank-mall`，Service 透明转发到 `jaeger-query.jaeger`。
+
+### 为什么不直接在 Ingress 中跨 namespace 引用？
+
+K8s Ingress 规则**不支持跨 namespace 引用后端 Service**。ExternalName Service 是标准解决方案：在同一个 namespace 创建一个代理 Service，通过 DNS CNAME 指向目标 namespace 的 Service。
+
+### 已知限制
+
+Ingress `rewrite-target: /$2` 与 Jaeger `QUERY_BASE_PATH=/jaeger` 冲突。当前团队通过 NodePort 31686 直连访问 Jaeger UI。如需 Ingress 路径正常，需为 Jaeger 路径配置独立的 rewrite 规则（`nginx.ingress.kubernetes.io/configuration-snippet`）。

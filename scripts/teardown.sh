@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-K8S_BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../k8s/base" && pwd)"
+K8S_BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../infra/kubernetes/base" && pwd)"
 
 echo "=== Deleting bank-mall resources ==="
 

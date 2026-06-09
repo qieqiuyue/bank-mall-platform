@@ -1,4 +1,4 @@
-package com.bank.account.exception;
+package com.bank.common.exception;
 
 public class BusinessException extends RuntimeException {
     private final ErrorCode errorCode;

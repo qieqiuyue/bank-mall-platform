@@ -77,6 +77,11 @@ docs/s5-interview-prep
 - 测试：JUnit 5
 - 数据库迁移：Flyway
 - 响应格式：统一 `ApiResponse<T>`（code/message/data/timestamp）
+- **RestClient 必须配置超时**：connect 2s / read 5s，禁止无超时的 `RestClient.builder().build()`
+- **DataInitializer 必须加 `@Profile("dev")`**：生产环境不灌入 demo 数据
+- **所有 Controller 的 `@RequestBody` 参数必须加 `@Valid`**
+- **所有 DTO 必须加 Bean Validation 注解**：`@NotBlank`/`@NotNull`/`@Positive`
+- **`ddl-auto` 只能用 `validate` 或 `none`**：禁止 `update`/`create-drop` 在生产 profile 下
 
 ### YAML / Kubernetes
 - 2 空格缩进
@@ -100,3 +105,28 @@ docs/s5-interview-prep
 - 禁止提交 `secret.yaml`、`.env`、`*.pem`、`*.key`
 - 提交前跑 Gitleaks
 - 发现密钥泄露 → 立即轮换 + 清除 git 历史
+
+## 代码审查红线（审计驱动）
+
+以下规则源自两轮深度审计中发现的真实问题，违反即 CI 阻断或 Review 驳回：
+
+| # | 规则 | 检查方式 |
+|---|------|---------|
+| 1 | RestClient 必须配置 connect/read 超时 | `grep -rn "RestClient.builder()" apps/*/src/main/java` — 无 `requestFactory` 即为违规 |
+| 2 | DataInitializer 必须加 `@Profile("dev")` | `grep -L "@Profile" apps/*/src/main/java/**/DataInitializer.java` |
+| 3 | 所有 `@RequestBody` 参数加 `@Valid` | `grep -rn "public.*@RequestBody" apps/*/src/main/java \| grep -v "@Valid"` |
+| 4 | `ddl-auto` 只能用 `validate` 或 `none` | `grep -rn "ddl-auto: update\|ddl-auto: create" apps/*/src/main/resources/` |
+| 5 | Docker HEALTHCHECK 与 K8s livenessProbe 路径一致 | 对比 Dockerfile 和 deployment.yaml 的 health 路径 |
+| 6 | 脚本中 MySQL 密码不走命令行参数 | `grep -rn "\-p\"" scripts/*.sh` — 应使用 `env MYSQL_PWD=` |
+| 7 | 日志中不能有 `password` / `secret` 等敏感字段 | Code Review 时人工检查 `log.info` / `log.debug` 参数 |
+| 8 | 禁止在构造器中生成业务 ID（UUID） | JPA 反射构造时产生副作用，移至 `@PrePersist` |
+
+### 准入红线自动化
+
+```bash
+# 提交前本地自检（约 5 秒）
+make lint                                          # Semgrep + Gitleaks
+grep -rn "ddl-auto: update" apps/*/src/main/       # 禁止 update
+grep -L "@Profile" apps/*/src/main/java/**/DataInitializer.java  # 禁止无 Profile
+grep -rn "RestClient.builder()" apps/*/src/main/java/ | grep -v requestFactory  # 必须有超时
+```

@@ -692,3 +692,146 @@ kubectl apply -f infra/kubernetes/base/jaeger/jaeger-pv.yaml
 - `Retain` 策略适合生产环境（防止误删数据），但实验环境推荐 **`Delete`**（PVC 删除时自动删 PV）
 - 重建 PVC 时先检查 PV 状态：`kubectl get pv | grep -E "Released|Failed"`
 - `hostPath` PV 删起来不丢数据，大胆 `kubectl delete pv`
+
+---
+
+## 九、RestClient 超时导致级联雪崩
+
+> 审计来源：两轮审计均发现，2026-06-09 修复。
+
+### 症状
+
+payment-service 调用 account-service 超时 → 所有请求队列堆积 → payment-service 整体不可用。日志显示 `Account service unreachable` 但 account-service Pod 在运行。
+
+### 根因
+
+`RestClientConfig` 中未设置 connect/read 超时。`SimpleClientHttpRequestFactory` 默认超时均为**无穷大**。account-service 出现 GC 停顿或线程池满时，TCP 连接仍然可达，但 HTTP 响应永远不返回 → 调用方线程阻塞 → Tomcat worker 线程池耗尽。
+
+### 排查步骤
+
+```bash
+# 1. 检查调用方 RestClientConfig 是否有超时配置
+grep -A5 "RestClient.builder()" apps/*/src/main/java/**/RestClientConfig.java
+
+# 2. 检查调用方线程状态（如果有 actuator）
+curl http://<pod>:<port>/actuator/metrics/tomcat.threads.busy
+
+# 3. 检查目标服务 GC 日志（如果有）
+kubectl logs <account-pod> -n bank-mall | grep -i "gc pause"
+```
+
+### 修复
+
+所有 `RestClientConfig` 统一添加超时：
+
+```java
+var factory = new SimpleClientHttpRequestFactory();
+factory.setConnectTimeout(Duration.ofSeconds(2));
+factory.setReadTimeout(Duration.ofSeconds(5));
+return RestClient.builder()
+    .requestFactory(factory)
+    .build();
+```
+
+### 教训
+
+- **任何 HTTP 调用必须设置超时**。默认无穷大的超时在生产环境中等于"一个慢服务拖垮所有调用方"。
+- 调用链路的 connect 超时 < 调用方自身的处理超时 < 网关总超时（洋葱模型）。
+
+---
+
+## 十、Jaeger Ingress rewrite 冲突
+
+> 审计来源：主审架构师审计，2026-06-09 发现。
+
+### 症状
+
+`http://<node>:30080/jaeger/` → Jaeger 返回空白页或 302 死循环。但 `http://<node>:31686/` NodePort 直连正常。
+
+### 根因
+
+两重配置冲突：
+
+1. Ingress rewrite-target: `/$2` — 将 `/jaeger/some-path` 改写为 `/some-path`
+2. Jaeger env: `QUERY_BASE_PATH=/jaeger` — Jaeger 期望所有请求路径以 `/jaeger` 开头
+
+改写后 Jaeger 收不到 `/jaeger` 前缀 → 静态资源路径解析失败 → 返回 302 重定向到 `/jaeger/` → 死循环。
+
+同时存在一个正确的 **ExternalName Service**：
+```yaml
+# jaeger-external-svc.yaml
+kind: Service
+metadata:
+  name: jaeger-ui          # bank-mall namespace
+spec:
+  type: ExternalName
+  externalName: jaeger-query.jaeger.svc.cluster.local   # jaeger namespace
+```
+这个 Service 负责跨命名空间路由，**不是** 503 的原因。
+
+### 排查步骤
+
+```bash
+# 1. NodePort 直连验证 Jaeger 自身是否正常
+curl -s http://10.0.0.41:31686/jaeger/
+
+# 2. 从 Ingress Controller Pod 内测试 Service 解析
+kubectl exec -n ingress-nginx deploy/ingress-nginx-controller -- \
+  wget -qO- http://jaeger-ui.bank-mall.svc.cluster.local:16686/jaeger/
+
+# 3. 检查 rewrite 规则是否影响
+kubectl describe ingress bank-mall-ingress -n bank-mall
+```
+
+### 修复
+
+为 Jaeger 路径使用独立的 rewrite 规则（或禁用 rewrite）：
+
+```yaml
+# 方案 A: nginx configuration-snippet
+annotations:
+  nginx.ingress.kubernetes.io/configuration-snippet: |
+    rewrite ^/jaeger(/|$)(.*) /jaeger/$2 break;
+```
+
+### 教训
+
+- `rewrite-target` 是全局的，对所有路径生效。有特殊需求的路径需要独立处理。
+- ExternalName Service 是合法的跨命名空间路由方案，不要误杀。
+
+---
+
+## 十一、Docker HEALTHCHECK 与 K8s 探针不一致
+
+> 审计来源：主审架构师审计，2026-06-09 发现并修复。
+
+### 症状
+
+`docker ps` 显示容器 unhealthy，但 `kubectl get pods` 显示 Running 且 Ready。或者相反——K8s 认为 Pod 健康，但 Docker 层面不断重启容器。
+
+### 根因
+
+Docker HEALTHCHECK 和 K8s livenessProbe 指向了不同的端点：
+
+| 服务 | Docker HEALTHCHECK（修复前） | K8s livenessProbe |
+|------|---------------------------|-------------------|
+| auth | `/api/auth/health` | `/actuator/health/liveness` |
+| payment | `/api/payments/health` | `/actuator/health/liveness` |
+| notification | `/api/notifications/health` | `/actuator/health/liveness` |
+| account | `/actuator/health` | `/actuator/health/liveness` |
+
+K8s 探针在 S2 改为 Actuator 端点后，Dockerfile 没有同步更新。
+
+### 修复
+
+统一所有 Dockerfile 的 HEALTHCHECK 为 `/actuator/health/liveness`：
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://localhost:8081/actuator/health/liveness || exit 1
+```
+
+### 教训
+
+- K8s 探针改了什么，Docker HEALTHCHECK 必须同步改。两者是同一个"健康"概念的两种检测方式。
+- `docker-compose` 或 `docker run` 环境下 HEALTHCHECK 是唯一的健康信号源，不一致会导致开发环境误判。

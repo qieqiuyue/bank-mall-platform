@@ -4,7 +4,7 @@ import com.bank.account.dto.*;
 import com.bank.account.entity.Account;
 import com.bank.account.entity.Transaction;
 import com.bank.account.entity.TransactionType;
-import com.bank.account.exception.BusinessException;
+import com.bank.common.exception.BusinessException;
 import com.bank.account.repository.AccountRepository;
 import com.bank.account.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;

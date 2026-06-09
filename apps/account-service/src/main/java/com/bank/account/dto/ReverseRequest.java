@@ -1,7 +1,11 @@
 package com.bank.account.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class ReverseRequest {
+    @NotBlank(message = "originalTransactionNo is required")
     private String originalTransactionNo;
+    @NotBlank(message = "idempotencyKey is required")
     private String idempotencyKey;
 
     public String getOriginalTransactionNo() { return originalTransactionNo; }

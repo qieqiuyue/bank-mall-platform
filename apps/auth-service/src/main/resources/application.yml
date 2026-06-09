@@ -13,12 +13,16 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
 
 logging:
   level:
@@ -26,7 +30,7 @@ logging:
     com.bank: DEBUG
 
 jwt:
-  secret: ${JWT_SECRET_KEY:ZGV2LXNlY3JldC1rZXktY2hhbmdlLWluLXByb2R1Y3Rpb24tMzJjaGFycw==}
+  secret: ${JWT_SECRET_KEY}
   expiration: ${JWT_EXPIRATION_HOURS:24}
 
 management:

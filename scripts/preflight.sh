@@ -110,7 +110,7 @@ if [ "$HPA_COUNT" -ge 4 ]; then
   done
 else
   log_fail "Only $HPA_COUNT/4 HPA resources found"
-  echo "  Fix: kubectl apply -f k8s/base/hpa/"
+  echo "  Fix: kubectl apply -f infra/kubernetes/base/hpa/"
   FAIL=$((FAIL+1))
 fi
 echo ""

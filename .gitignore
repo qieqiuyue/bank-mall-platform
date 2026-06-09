@@ -77,3 +77,13 @@ assets/screenshots/
 
 # OpenCode internal files
 .opencode/
+
+# Claude Code internal files
+.claude/
+MEMORY.md
+
+# === Project-local docs (not for GitHub) ===
+CLAUDE.md
+GLM_AUDIT_REPORT.md
+TECH_AUDIT_REPORT.md
+AUDIT_FINAL.md

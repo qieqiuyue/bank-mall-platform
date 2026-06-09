@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: mysql
   namespace: bank-mall
@@ -8,9 +8,8 @@ metadata:
     app.kubernetes.io/part-of: bank-mall
     app.kubernetes.io/component: database
 spec:
+  serviceName: mysql
   replicas: 1
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
       app: mysql

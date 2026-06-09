@@ -4,8 +4,8 @@ import com.bank.account.dto.*;
 import com.bank.account.entity.Account;
 import com.bank.account.entity.Transaction;
 import com.bank.account.entity.TransactionType;
-import com.bank.account.exception.BusinessException;
-import com.bank.account.exception.ErrorCode;
+import com.bank.common.exception.BusinessException;
+import com.bank.common.exception.ErrorCode;
 import com.bank.account.repository.AccountRepository;
 import com.bank.account.repository.TransactionRepository;
 import org.slf4j.Logger;
@@ -25,7 +25,8 @@ import java.util.stream.Collectors;
 public class AccountService {
     private static final Logger log = LoggerFactory.getLogger(AccountService.class);
     private static final int MAX_RETRY = 3;
-    private static final DateTimeFormatter TXN_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
+    private static final DateTimeFormatter TXN_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final java.util.concurrent.ThreadLocalRandom RNG = java.util.concurrent.ThreadLocalRandom.current();
 
     private final AccountRepository accountRepo;
     private final TransactionRepository txnRepo;
@@ -52,10 +53,11 @@ public class AccountService {
         return findAccount(accountNo).getBalance();
     }
 
-    public List<TransactionResponse> getTransactions(String accountNo) {
+    public org.springframework.data.domain.Page<TransactionResponse> getTransactions(String accountNo,
+            org.springframework.data.domain.Pageable pageable) {
         findAccount(accountNo); // validate existence
-        return txnRepo.findByAccountNoOrderByCreatedAtDesc(accountNo)
-                .stream().map(TransactionResponse::from).collect(Collectors.toList());
+        return txnRepo.findByAccountNoOrderByCreatedAtDesc(accountNo, pageable)
+                .map(TransactionResponse::from);
     }
 
     public TransactionResponse debit(String accountNo, DebitRequest req) {
@@ -198,14 +200,25 @@ public class AccountService {
                     throw new BusinessException(ErrorCode.OPTIMISTIC_LOCK_CONFLICT,
                             "Optimistic lock conflict after " + MAX_RETRY + " retries");
                 }
-                log.warn("Optimistic lock retry {}/{}", attempt + 1, MAX_RETRY);
+                // Exponential backoff: 20ms, 80ms, 320ms
+                long backoffMs = (long) (20 * Math.pow(4, attempt));
+                log.warn("Optimistic lock retry {}/{} — backing off {}ms", attempt + 1, MAX_RETRY, backoffMs);
+                try {
+                    Thread.sleep(backoffMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new BusinessException(ErrorCode.OPTIMISTIC_LOCK_CONFLICT, "Retry interrupted");
+                }
             }
         }
         throw new BusinessException(ErrorCode.OPTIMISTIC_LOCK_CONFLICT, "Retry exhausted");
     }
 
+    /** Generates a unique transaction number with nanosecond + random suffix to prevent collision. */
     private String generateTxnNo() {
-        return "TXN" + LocalDateTime.now().format(TXN_FMT);
+        return "TXN" + LocalDateTime.now().format(TXN_FMT)
+                + String.format("%09d", java.time.LocalTime.now().getNano())
+                + String.format("%04d", RNG.nextInt(10000));
     }
 
     private CreditRequest toCreditForReverse(BigDecimal amount, Transaction original, ReverseRequest req) {

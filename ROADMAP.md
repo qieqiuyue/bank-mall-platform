@@ -76,11 +76,6 @@
 - [x] Document cleanup — 50→13 active docs（merged 2 journals + 4 postmortems, archived 47 to Git history）
 - [x] `.opencode/AGENTS.md` — SB 4.0.6 breaking changes + 8 team conventions + GFW matrix
 
-- [ ] Swagger/OpenAPI (springdoc-openapi v2)
-- [ ] Helm Charts (dev/staging/prod)
-- [ ] High-availability architecture design document
-- [ ] Redis idempotency design document
-
 ### S5.5：Audit Remediation ✅ Complete（2026-06-09）
 
 > 五轮交叉验证审计（Claude + Kimi + 架构师 + GLM-5.1）+ 主审架构师灾难预演 → 修复 28/31 P0、26/31 P1、2/10 P2

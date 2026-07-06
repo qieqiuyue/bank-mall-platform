@@ -2,7 +2,7 @@
 
 ## 3 分钟版本（HR/初筛）
 
-> 我参与了一个银行电子商城的云原生改造项目。项目背景是将传统的单体应用拆分为 Spring Boot 微服务，并基于 Kubernetes 进行容器化部署。
+> 我独立设计并搭建了一个模拟银行电子商城的云原生实战项目。项目背景是围绕银行电子商城业务场景，将传统的单体应用拆分为 Spring Boot 微服务，并基于 Kubernetes 进行容器化部署。
 >
 > 我主要负责的工作包括：
 > 1. 设计并实现了 4 个微服务的容器化方案，使用 Dockerfile 多阶段构建，镜像体积从 500MB 优化到 180MB
@@ -21,11 +21,11 @@
 
 ### 开场（30 秒）
 
-> 我想分享一个我参与的 Kubernetes 云原生改造项目。这个项目不是公司真实生产系统，而是我围绕银行电子商城业务场景，独立设计并实践的一套云原生部署方案。虽然规模不如生产环境复杂，但核心链路是完整的，而且我在实践中遇到了很多真实问题并逐一解决。
+> 我想分享一个我独立设计并搭建的 Kubernetes 云原生实战项目。这个项目不是公司真实生产系统，而是我围绕银行电子商城业务场景，独立设计并实践的一套云原生部署方案。虽然规模不如生产环境复杂，但核心链路是完整的，而且我在实践中遇到了很多真实问题并逐一解决。
 
 ### 项目背景（1 分钟）
 
-> 银行原有电子渠道系统采用传统部署方式，每次发布都是手工操作，版本不可控，扩容需要申请服务器，一次故障可能影响整个系统。我的目标是将其拆分为微服务，基于 Kubernetes 实现容器化部署，解决发布效率、弹性伸缩和故障隔离的问题。
+> 模拟某银行电子商城业务场景：传统部署方式每次发布都是手工操作，版本不可控，扩容需要申请服务器，一次故障可能影响整个系统。我的目标是将其拆分为微服务，基于 Kubernetes 实现容器化部署，解决发布效率、弹性伸缩和故障隔离的问题。
 
 ### 技术架构（1 分钟）
 
@@ -117,7 +117,7 @@
 >
 > **高可用规划**：V1 是 1 master + 2 worker 实验集群；生产方案是 3 master + HAProxy + Keepalived，etcd 定期快照备份
 > **安全**：NetworkPolicy 限制服务间通信、RBAC 权限最小化、Pod Security Standards
-> **可观测性**：Prometheus + Grafana 监控、Grafana Alerting、Loki/Promtail 日志采集；Jaeger 链路追踪是 V2 规划
+> **可观测性**：Prometheus + Grafana 监控、Grafana Alerting、Loki/Promtail 日志采集、Jaeger 1.60 + OTEL Java Agent 链路追踪(均已落地 S2 ✅)
 > **存储**：对接 Ceph/Longhorn，实现有状态服务的数据持久化
 > **CI/CD**：ArgoCD GitOps 流水线，实现代码提交到生产部署的自动化
 
@@ -139,7 +139,7 @@
 | 探针怎么配？ | liveness 30s 延迟，readiness 10s 延迟，/api/<service>/health |
 | 资源限制？ | requests 100m/256Mi，limits 500m/512Mi |
 | 怎么解决镜像拉取失败？ | 阿里云镜像站 + 手动 ctr pull --plain-http |
-| 生产还缺什么？ | 多 master 高可用、生产级存储、Redis、OpenTelemetry/Jaeger、AlertManager HA、GitOps |
+| 生产还缺什么？ | 多 master 高可用、生产级存储、Redis、AlertManager HA、Velero DR、Kyverno 策略 |
 | 项目亮点？ | 不是简单跑通，而是补齐了 ConfigMap、探针、资源限制、Ingress、HPA、NetworkPolicy/PSA、监控、日志和 Grafana 告警 |
 
 ---
@@ -165,7 +165,7 @@
 
 ### 案例 1：NetworkPolicy 误配 — 全部 Pod Running 但业务不通
 
-"有一次压测，payment 全失败但所有 Pod 的状态都是 Running。payment 日志显示 `Connect timed out` 到 account-service:8082——这说明 account Pod 在运行但不可达。第二件事我确认 account Pod 是 1/1 Running，但它的业务日志没有任何来自 payment 的请求——流量根本没到。这是典型的网络层拦截。第三件事 `kubectl describe netpol -n bank-mall`——发现入站白名单只有 auth-service 和 notification-service，payment-service 被漏了。根因确认：运维在 apply YAML 时少写了一行 `app: payment-service`。恢复就是一行 `kubectl apply -f original.yaml`，然后压测恢复到 161/161 全过。这个案例说明 deny-all 白名单模型下，故障不是 Pod 挂了这种一眼能看出的问题，而是网络规则层面的隐性问题。"
+"有一次混沌实验，我故意用同名 NetworkPolicy 覆盖文件删掉了 payment 的入站白名单。payment 全失败但所有 Pod 的状态都是 Running。payment 日志显示 `Connect timed out` 到 account-service:8082——这说明 account Pod 在运行但不可达。第二件事我确认 account Pod 是 1/1 Running，但它的业务日志没有任何来自 payment 的请求——流量根本没到。这是典型的网络层拦截。第三件事 `kubectl describe netpol -n bank-mall`——发现入站白名单只有 auth-service 和 notification-service，payment-service 被漏了。根因确认：我在混沌实验中故意删掉了一行 `app: payment-service` 来模拟误配。恢复就是一行 `kubectl apply -f original.yaml`，然后压测恢复到 161/161 全过。MTTR 5 分钟。这个案例说明 deny-all 白名单模型下，故障不是 Pod 挂了这种一眼能看出的问题，而是网络规则层面的隐性问题。"
 
 ### 案例 2：HPA 冷启动死亡螺旋 — 100 并发 93% 503
 

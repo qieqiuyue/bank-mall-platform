@@ -4,6 +4,7 @@
 
 A cloud-native microservices platform running on a real 4-node VMware K8s cluster. Four Spring Boot services with full observability, zero-trust NetworkPolicy, ArgoCD GitOps, and chaos-engineering-validated resilience.
 
+[![CI](https://github.com/qieqiuyue/bank-mall-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/qieqiuyue/bank-mall-platform/actions)
 [![Java](https://img.shields.io/badge/Java_21-ED8B00?logo=openjdk&logoColor=white)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot_4.0.6-6DB33F?logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes_v1.36-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
@@ -39,16 +40,31 @@ A cloud-native microservices platform running on a real 4-node VMware K8s cluste
 
 ## Architecture
 
-```
-Ingress Nginx (NodePort 30080)
-  ├── /auth/*          → auth-service:8081       (BCrypt + JWT)
-  ├── /account/*       → account-service:8082     (JPA + optimistic locking)
-  ├── /payment/*       → payment-service:8083     (RestClient + compensation)
-  └── /notification/*  → notification-service:8084 (event logging)
-
-payment-service → account-service (debit / credit / reverse)
-payment-service → notification-service (log)
-All services → Jaeger (OTLP gRPC / HTTP) for distributed tracing
+```mermaid
+graph TD
+    User[User / k6] -->|NodePort 30080| Ingress[Ingress-Nginx :30080]
+    Ingress -->|"/auth/*"| Auth[auth-service :8081]
+    Ingress -->|"/account/*"| Account[account-service :8082]
+    Ingress -->|"/payment/*"| Payment[payment-service :8083]
+    Ingress -->|"/notification/*"| Notify[notification-service :8084]
+    Payment -->|"RestClient debit/credit/reverse"| Account
+    Payment -->|"RestClient fire-and-forget"| Notify
+    Auth --> MySQL[(MySQL :3306)]
+    Account --> MySQL
+    Payment --> MySQL
+    Notify --> MySQL
+    Auth -.->|OTLP gRPC| Tempo[Tempo :4317]
+    Account -.-> Tempo
+    Payment -.-> Tempo
+    Notify -.-> Tempo
+    Prometheus[Prometheus] -->|scrape /actuator/prometheus| Auth
+    Prometheus --> Account
+    Prometheus --> Payment
+    Prometheus --> Notify
+    Promtail[Promtail DaemonSet] -->|log tail| Auth
+    Loki[Loki] -->|query| Grafana[Grafana]
+    Prometheus -->|datasource| Grafana
+    Tempo -->|datasource| Grafana
 ```
 
 ```
@@ -79,7 +95,7 @@ All services → Jaeger (OTLP gRPC / HTTP) for distributed tracing
 | Metrics | Prometheus + Micrometer |
 | Dashboards | Grafana (provisioned, 3 alert rules) |
 | Logs | Loki + Promtail |
-| Tracing | Jaeger 1.60 LTS + OpenTelemetry Java Agent |
+| Tracing | Grafana Tempo + OpenTelemetry Java Agent |
 | SAST / Secret Detection | Semgrep + Gitleaks |
 | CI/CD | GitHub Actions (5 jobs) + `scripts/ci.sh` (Trivy soft gate, NJU mirror) |
 | Packaging | Helm Chart skeleton (Kustomize is V1 source of truth) |

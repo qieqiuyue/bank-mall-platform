@@ -4,12 +4,12 @@ metadata:
   name: jaeger-collector
   namespace: jaeger
   labels:
-    app: jaeger
+    app: tempo
     app.kubernetes.io/part-of: bank-mall
 spec:
   type: ClusterIP
   selector:
-    app: jaeger
+    app: tempo
   ports:
   - name: otlp-grpc
     port: 4317
@@ -26,15 +26,15 @@ metadata:
   name: jaeger-query
   namespace: jaeger
   labels:
-    app: jaeger
+    app: tempo
     app.kubernetes.io/part-of: bank-mall
 spec:
   type: NodePort
   selector:
-    app: jaeger
+    app: tempo
   ports:
-  - name: ui
+  - name: query
     port: 16686
-    targetPort: 16686
+    targetPort: 3200
     nodePort: 31686
     protocol: TCP

@@ -6,7 +6,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: jaeger
+      app: tempo
   policyTypes:
   - Ingress
   ingress:
@@ -16,4 +16,4 @@ spec:
           name: ingress-nginx
     ports:
     - protocol: TCP
-      port: 16686
+      port: 3200

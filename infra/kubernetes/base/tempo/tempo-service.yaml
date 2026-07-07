@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: jaeger-collector
-  namespace: jaeger
+  name: tempo-collector
+  namespace: tempo
   labels:
     app: tempo
     app.kubernetes.io/part-of: bank-mall
@@ -23,8 +23,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: jaeger-query
-  namespace: jaeger
+  name: tempo-query
+  namespace: tempo
   labels:
     app: tempo
     app.kubernetes.io/part-of: bank-mall

@@ -37,7 +37,7 @@ spec:
   - to:
     - namespaceSelector:
         matchLabels:
-          name: jaeger
+          name: tempo
     ports:
     - protocol: TCP
       port: 4317

@@ -1,8 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-ingress-to-jaeger
-  namespace: jaeger
+  name: allow-ingress-to-tempo
+  namespace: tempo
 spec:
   podSelector:
     matchLabels:

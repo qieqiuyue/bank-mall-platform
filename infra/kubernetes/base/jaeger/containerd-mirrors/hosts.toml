@@ -1,4 +1,0 @@
-server = "https://docker.io"
-
-[host."https://docker.nju.edu.cn"]
-  capabilities = ["pull", "resolve"]

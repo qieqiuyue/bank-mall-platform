@@ -6,7 +6,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: jaeger
+      app: tempo
   policyTypes:
   - Ingress
   ingress:
@@ -16,7 +16,7 @@ spec:
           name: monitoring
     ports:
     - protocol: TCP
-      port: 16686
+      port: 3200
   - from:
     - namespaceSelector:
         matchLabels:
@@ -27,4 +27,4 @@ spec:
     - protocol: TCP
       port: 4318
     - protocol: TCP
-      port: 16686
+      port: 3200

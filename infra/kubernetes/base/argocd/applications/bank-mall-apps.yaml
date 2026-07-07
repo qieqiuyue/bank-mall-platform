@@ -13,7 +13,7 @@ spec:
       recurse: true
       exclude: |
         argocd/
-        jaeger/
+        tempo/
         monitoring/
         ingress/
         security/

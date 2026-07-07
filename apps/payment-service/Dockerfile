@@ -9,7 +9,7 @@ COPY payment-service/src payment-service/src
 RUN sed -i '/<modules>/,/<\/modules>/d' pom.xml && mvn install -N -DskipTests -q && cd common-lib && mvn install -DskipTests -q && cd /app/payment-service && mvn clean package -DskipTests -q
 
 FROM eclipse-temurin:21-alpine
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && apk upgrade --no-cache
 WORKDIR /app
 COPY --from=builder /app/payment-service/target/*.jar app.jar
 EXPOSE 8083

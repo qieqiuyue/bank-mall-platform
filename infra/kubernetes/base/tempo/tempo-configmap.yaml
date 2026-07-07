@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: tempo-config
-  namespace: jaeger
+  namespace: tempo
   labels:
     app: tempo
     app.kubernetes.io/part-of: bank-mall

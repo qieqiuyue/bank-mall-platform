@@ -18,7 +18,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: tempo-data-pvc
-  namespace: jaeger
+  namespace: tempo
   labels:
     app: tempo
     app.kubernetes.io/part-of: bank-mall

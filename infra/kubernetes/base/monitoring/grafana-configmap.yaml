@@ -27,7 +27,7 @@ data:
       uid: tempo
       type: tempo
       access: proxy
-      url: http://jaeger-query.jaeger.svc.cluster.local:16686
+      url: http://tempo-query.tempo.svc.cluster.local:16686
       editable: true
   dashboard-provider.yaml: |
     apiVersion: 1

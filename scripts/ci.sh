@@ -125,11 +125,37 @@ cd "${ROOT_DIR}"
 if git diff --quiet && git diff --cached --quiet; then
   echo "No changes to commit — ArgoCD will maintain current state"
 else
+  # Branch protection: CONTRIBUTING.md forbids direct push to protected
+  # branches (GitHub Flow — all changes must land via a PR).
+  # Intentional escape hatch: ALLOW_DIRECT_PUSH=1.
+  CURRENT_BRANCH="$(git branch --show-current)"
+  if [[ "${ALLOW_DIRECT_PUSH:-}" != "1" ]]; then
+    case "${CURRENT_BRANCH}" in
+      main|master)
+        log_fail "Direct push to '${CURRENT_BRANCH}' is blocked — CONTRIBUTING.md requires PR-based delivery"
+        echo ""
+        echo "  PR 流程指引："
+        echo "    1) git checkout main && git pull"
+        echo "    2) git checkout -b feat/s0-xxx"
+        echo "    3) git push origin feat/s0-xxx"
+        echo "    4) GitHub → Pull requests → New pull request (feat/s0-xxx → main)"
+        echo ""
+        echo "  （有意直推请设置 ALLOW_DIRECT_PUSH=1 后重跑）"
+        exit 1
+        ;;
+    esac
+  fi
+
+  # RUN_TESTS not enabled — warn before pushing without the test gate
+  if [[ "${RUN_TESTS:-false}" != "true" ]]; then
+    echo "[WARN] RUN_TESTS not enabled — pushing without the Maven test gate"
+  fi
+
   git add -A
   git commit -m "deploy: update image tags to ${VERSION}
 
 [skip ci] — ArgoCD auto-sync triggers deployment"
-  git push origin "$(git branch --show-current)"
+  git push origin "${CURRENT_BRANCH}"
   log_pass "Pushed to Git — ArgoCD will auto-sync"
 fi
 

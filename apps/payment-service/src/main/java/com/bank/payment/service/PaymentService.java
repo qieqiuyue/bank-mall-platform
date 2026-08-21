@@ -14,6 +14,7 @@ import com.bank.payment.repository.PaymentRepository;
 import com.bank.payment.repository.PaymentTransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -82,12 +83,26 @@ public class PaymentService {
         payment.setAmount(req.getAmount());
         payment.setCurrency(req.getCurrency() != null ? req.getCurrency() : "CNY");
         payment.setIdempotencyKey(idempotencyKey);
-        paymentRepo.save(payment);
+        try {
+            paymentRepo.save(payment);
+        } catch (DataIntegrityViolationException e) {
+            // P1-1: concurrent request with same idempotencyKey already inserted the row.
+            // DB unique constraint (uk_idempotency) is the safety net — surface it as a
+            // business conflict instead of a raw 500. Re-check and return the existing payment.
+            log.warn("Idempotency key conflict on save for key {}", idempotencyKey);
+            Optional<Payment> existing = paymentRepo.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                return PaymentResponse.from(existing.get());
+            }
+            throw new BusinessException(ErrorCode.PAYMENT_ALREADY_PROCESSED,
+                    "Payment with idempotency key " + idempotencyKey + " already exists");
+        }
 
         boolean hasDebit = false;
+        AccountServiceResponse.TransactionData debitResp = null;
         try {
             // Step 1: Debit payer
-            AccountServiceResponse.TransactionData debitResp = accountClient.debit(
+            debitResp = accountClient.debit(
                     req.getPayerAccount(), req.getAmount(), idempotencyKey);
             saveTxn(payment, debitResp.getTransactionNo(), "ACCOUNT", "DEBIT", "SUCCESS");
             hasDebit = true;
@@ -104,7 +119,8 @@ public class PaymentService {
         } catch (Exception e) {
             if (hasDebit) {
                 // Compensation: debit succeeded but credit failed → reverse the debit
-                AccountServiceResponse.TransactionData revResp = reverseWithRetry(req.getPayerAccount(), req.getAmount(), idempotencyKey);
+                AccountServiceResponse.TransactionData revResp = reverseWithRetry(
+                        req.getPayerAccount(), req.getAmount(), idempotencyKey, debitResp.getTransactionNo());
                 if (revResp != null) {
                     saveTxn(payment, revResp.getTransactionNo(), "ACCOUNT", "REVERSAL", "SUCCESS");
                     payment.setStatus("FAILED");
@@ -124,12 +140,16 @@ public class PaymentService {
             }
         }
 
-        // Step 3: Notify — non-blocking, failure does not roll back payment
-        try {
-            notificationClient.send(req.getPayerAccount(), "PAYMENT_SUCCESS",
-                    "Payment of " + req.getAmount() + " " + payment.getCurrency() + " processed.");
-        } catch (Exception ex) {
-            log.warn("Notification failed for payment {}: {}", payment.getPaymentNo(), ex.getMessage());
+        // Step 3: Notify — non-blocking, failure does not roll back payment.
+        // Only COMPLETED payments send success notification; failed ones are skipped
+        // (P0-2: never tell the user "PAYMENT_SUCCESS" for a failed/error payment).
+        if ("COMPLETED".equals(payment.getStatus())) {
+            try {
+                notificationClient.send(req.getPayerAccount(), "PAYMENT_SUCCESS",
+                        "Payment of " + req.getAmount() + " " + payment.getCurrency() + " processed.");
+            } catch (Exception ex) {
+                log.warn("Notification failed for payment {}: {}", payment.getPaymentNo(), ex.getMessage());
+            }
         }
 
         paymentRepo.save(payment);
@@ -139,11 +159,12 @@ public class PaymentService {
     }
 
     /** Manual 3-retry loop with exponential backoff — no spring-retry dependency. Returns TransactionData on success, null on exhaustion. */
-    private AccountServiceResponse.TransactionData reverseWithRetry(String accountNo, BigDecimal amount, String idempotencyKey) {
+    private AccountServiceResponse.TransactionData reverseWithRetry(String accountNo, BigDecimal amount,
+                                                                     String idempotencyKey, String originalTxnNo) {
         for (int attempt = 0; attempt < MAX_REVERSE_RETRY; attempt++) {
             try {
                 AccountServiceResponse.TransactionData revResp = accountClient.reverse(
-                        accountNo, "debit-" + idempotencyKey, idempotencyKey);
+                        accountNo, originalTxnNo, idempotencyKey);
                 log.info("Reverse attempt {}/{} succeeded: txn={}", attempt + 1, MAX_REVERSE_RETRY,
                         revResp.getTransactionNo());
                 return revResp;

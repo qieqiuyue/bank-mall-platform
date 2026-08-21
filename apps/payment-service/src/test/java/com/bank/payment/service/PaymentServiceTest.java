@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -68,6 +69,8 @@ class PaymentServiceTest {
         verify(accountClient, times(1)).debit(any(), any(), any());
         verify(accountClient, times(1)).credit(any(), any(), any());
         verify(accountClient, never()).reverse(any(), any(), any());
+        // P0-2: only COMPLETED payments send success notification
+        verify(notificationClient, times(1)).send(eq("A1001"), eq("PAYMENT_SUCCESS"), anyString());
     }
 
     @Test
@@ -79,7 +82,7 @@ class PaymentServiceTest {
         when(accountClient.credit(eq("MALL-SETTLEMENT"), any(), eq("KEY-002")))
                 .thenThrow(new BusinessException(
                         com.bank.common.exception.ErrorCode.ACCOUNT_SERVICE_UNAVAILABLE, "Credit failed"));
-        when(accountClient.reverse(eq("A1001"), eq("debit-KEY-002"), eq("KEY-002")))
+        when(accountClient.reverse(eq("A1001"), eq("TXN-TEST-001"), eq("KEY-002")))
                 .thenReturn(mockData);
 
         PaymentResponse resp = paymentService.processPayment(req("KEY-002"));
@@ -87,7 +90,10 @@ class PaymentServiceTest {
         assertEquals("FAILED", resp.getStatus());
         assertTrue(resp.getFailReason().contains("Reversal successful"));
         verify(accountClient, times(1)).debit(any(), any(), any());
-        verify(accountClient, times(1)).reverse(any(), any(), any());
+        // P0-1: reversal must reference the real debit transaction number, not the idempotency key prefix
+        verify(accountClient).reverse(eq("A1001"), eq("TXN-TEST-001"), eq("KEY-002"));
+        // P0-2: failed payment must not send success notification
+        verify(notificationClient, never()).send(anyString(), eq("PAYMENT_SUCCESS"), anyString());
     }
 
     @Test
@@ -108,6 +114,8 @@ class PaymentServiceTest {
         assertTrue(resp.getFailReason().contains("Reverse retried 3 times"));
         verify(accountClient, times(1)).debit(any(), any(), any());
         verify(accountClient, times(3)).reverse(any(), any(), any());
+        // P0-2: error payments must not send success notification
+        verify(notificationClient, never()).send(anyString(), eq("PAYMENT_SUCCESS"), anyString());
     }
 
     @Test
@@ -122,6 +130,8 @@ class PaymentServiceTest {
         assertEquals("FAILED", resp.getStatus());
         verify(accountClient, never()).credit(any(), any(), any());
         verify(accountClient, never()).reverse(any(), any(), any());
+        // P0-2: failed payment must not send success notification
+        verify(notificationClient, never()).send(anyString(), eq("PAYMENT_SUCCESS"), anyString());
     }
 
     @Test
@@ -233,6 +243,47 @@ class PaymentServiceTest {
         assertEquals(new BigDecimal("299.00"), saved.getAmount());
         assertEquals("CNY", saved.getCurrency());
         assertNotNull(saved.getPaymentNo());
+    }
+
+    @Test
+    void processPayment_concurrentDuplicateKey_returnsExistingPayment() {
+        // P1-1: two requests with the same idempotencyKey race. The first save() inserts,
+        // the second hits the uk_idempotency unique constraint → must return the existing
+        // payment instead of a raw 500.
+        Payment existing = new Payment();
+        existing.setPaymentNo("PAY-CONCURRENT");
+        existing.setStatus("COMPLETED");
+        existing.setPayerAccount("A1001");
+        existing.setPayeeAccount("MALL-SETTLEMENT");
+        existing.setAmount(new BigDecimal("299.00"));
+        existing.setCurrency("CNY");
+
+        when(paymentRepo.findByIdempotencyKey("KEY-CONCURRENT")).thenReturn(Optional.empty(), Optional.of(existing));
+        when(paymentRepo.save(any()))
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry 'KEY-CONCURRENT' for uk_idempotency"));
+
+        PaymentResponse resp = paymentService.processPayment(req("KEY-CONCURRENT"));
+
+        assertEquals("COMPLETED", resp.getStatus());
+        assertEquals("PAY-CONCURRENT", resp.getPaymentNo());
+        // No debit/credit/reverse attempted — the duplicate was detected at insert time
+        verify(accountClient, never()).debit(any(), any(), any());
+        verify(accountClient, never()).credit(any(), any(), any());
+        verify(accountClient, never()).reverse(any(), any(), any());
+    }
+
+    @Test
+    void processPayment_concurrentDuplicateKey_noExistingRow_throwsBusinessConflict() {
+        // P1-1: save() hits unique constraint but re-check finds nothing (edge race) →
+        // surface as a business conflict, not a raw 500.
+        when(paymentRepo.findByIdempotencyKey("KEY-CONFLICT")).thenReturn(Optional.empty(), Optional.empty());
+        when(paymentRepo.save(any()))
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry for uk_idempotency"));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> paymentService.processPayment(req("KEY-CONFLICT")));
+
+        assertEquals(com.bank.common.exception.ErrorCode.PAYMENT_ALREADY_PROCESSED, ex.getErrorCode());
     }
 
     private PaymentRequest req(String idempotencyKey) {

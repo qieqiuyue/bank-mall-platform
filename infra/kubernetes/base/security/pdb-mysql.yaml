@@ -1,0 +1,13 @@
+# A-8: PDB for MySQL — single-replica StatefulSet on k8s-worker01.
+# Even with 1 replica, minAvailable: 1 blocks disruptive voluntary evictions
+# (kubectl drain / node maintenance) from taking the DB down silently.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mysql-pdb
+  namespace: bank-mall
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: mysql

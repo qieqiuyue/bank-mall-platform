@@ -46,7 +46,11 @@ data:
           - uid: webhook-1
             type: webhook
             settings:
-              url: http://localhost:9999/alerts
+              # A-4: was http://localhost:9999/alerts (nothing listens on that port
+              # inside the Grafana pod → every alert silently dropped).
+              # Replace with a real endpoint (Feishu/DingTalk/Alertmanager bridge)
+              # before relying on alert delivery. Kept as a clearly-marked placeholder.
+              url: http://alert-bridge.monitoring.svc.cluster.local:8080/alerts
               httpMethod: POST
             disableResolveMessage: false
   notification-policies.yaml: |

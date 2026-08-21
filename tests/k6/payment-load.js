@@ -44,7 +44,7 @@ export default function () {
     },
   };
 
-  const res = http.post(`${BASE_URL}/api/payments`, payload, params);
+  const res = http.post(`${BASE_URL}/payment/api/payments`, payload, params);
 
   check(res, {
     'status is 200': (r) => r.status === 200,

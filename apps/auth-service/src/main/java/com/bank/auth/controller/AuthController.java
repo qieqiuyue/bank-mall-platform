@@ -48,7 +48,7 @@ public class AuthController {
     @Operation(summary = "用户登录", description = "使用 username + password 获取 JWT 令牌")
     public ApiResponse<Map<String, Object>> login(@RequestBody(required = false) Map<String, String> body,
                                                    HttpServletRequest request) {
-        String clientIp = request.getRemoteAddr();
+        String clientIp = getClientIp(request);
         if (!rateLimiter.allow(clientIp)) {
             return ApiResponse.error("RATE_LIMITED", "Too many login attempts. Try again later.");
         }
@@ -61,6 +61,14 @@ public class AuthController {
 
         if (username.isEmpty() || password.isEmpty()) {
             return ApiResponse.error("BAD_REQUEST", "Missing username or password");
+        }
+
+        // Account-level lockout (credential-stuffing protection): reject immediately
+        // when this username has too many consecutive failures.
+        if (rateLimiter.isAccountLocked(username)) {
+            log.warn("Login rejected for locked account {} (IP {})", username, clientIp);
+            metrics.recordLogin("FAILED");
+            return ApiResponse.error("ACCOUNT_LOCKED", "Account temporarily locked. Try again later.");
         }
 
         Optional<User> userOpt = userRepository.findByUsername(username);
@@ -77,12 +85,32 @@ public class AuthController {
             result.put("roles", Arrays.asList(rolesStr.split(",")));
             result.put("issuedAt", Instant.now().toString());
             rateLimiter.clear(clientIp);
+            rateLimiter.clearAccount(username);
             metrics.recordLogin("SUCCESS");
             return ApiResponse.success("Login successful", result);
         }
 
+        rateLimiter.recordFailure(username);
         metrics.recordLogin("FAILED");
         return ApiResponse.error("AUTH_FAILED", "Invalid username or password");
+    }
+
+    /**
+     * Resolve the real client IP behind the Ingress proxy.
+     * nginx-ingress appends the client address to X-Forwarded-For ($proxy_add_x_forwarded_for),
+     * so the LAST address is the trustworthy one — taking the first would let a client
+     * spoof any value. Falls back to the socket address when no XFF header is present.
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            String[] parts = xff.split(",");
+            String last = parts[parts.length - 1].trim();
+            if (!last.isEmpty()) {
+                return last;
+            }
+        }
+        return request.getRemoteAddr();
     }
 
     @PostMapping("/validate")

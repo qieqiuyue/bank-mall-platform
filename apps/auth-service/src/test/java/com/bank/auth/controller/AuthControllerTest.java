@@ -17,6 +17,8 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -68,6 +70,35 @@ class AuthControllerTest {
                         .content("{\"username\":\"admin\",\"password\":\"wrong\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("AUTH_FAILED"));
+        verify(rateLimiter).recordFailure("admin");
+    }
+
+    @Test
+    void login_accountLocked() throws Exception {
+        when(rateLimiter.isAccountLocked("admin")).thenReturn(true);
+
+        mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin\",\"password\":\"whatever\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"));
+        verify(userRepository, never()).findByUsername(anyString());
+    }
+
+    @Test
+    void login_usesXForwardedForRealClientIp() throws Exception {
+        // P1-3: behind the Ingress proxy, X-Forwarded-For carries the real client IP;
+        // the limiter must key on it (last entry — nginx appends $remote_addr last),
+        // not on the Ingress Pod IP from getRemoteAddr().
+        when(rateLimiter.allow("203.0.113.7")).thenReturn(true);
+
+        mvc.perform(post("/api/auth/login")
+                        .header("X-Forwarded-For", "10.244.1.5, 203.0.113.7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin\",\"password\":\"x\"}"))
+                .andExpect(status().isOk());
+
+        verify(rateLimiter).allow("203.0.113.7");
     }
 
     @Test

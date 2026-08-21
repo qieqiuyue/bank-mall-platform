@@ -86,4 +86,5 @@ MEMORY.md
 CLAUDE.md
 GLM_AUDIT_REPORT.md
 TECH_AUDIT_REPORT.md
-AUDIT_FINAL.md
+# Audit reports kept private (REDACTed AUDIT_FINAL.md lives in docs/)
+docs/audit-private/

@@ -25,6 +25,16 @@
     <maven.compiler.target>21</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <tomcat.version>11.0.22</tomcat.version>
+    <!-- Trivy HIGH CVE fixes — BOM property overrides (align the whole family, not single artifacts) -->
+    <!-- jackson-core GHSA-r7wm-3cxj-wff9: 2.21.2 → 2.21.4 (Jackson 2), 3.1.2 → 3.1.4 (Jackson 3) -->
+    <jackson-2-bom.version>2.21.4</jackson-2-bom.version>
+    <jackson-bom.version>3.1.4</jackson-bom.version>
+    <!-- micrometer-core CVE-2026-40983/40984: 1.16.5 → 1.16.6 -->
+    <micrometer.version>1.16.6</micrometer.version>
+    <!-- spring-data-commons CVE-2026-41695/41716: 4.0.5 → 4.0.6 -->
+    <spring-data-bom.version>2025.1.6</spring-data-bom.version>
+    <!-- spring-framework CVE-2026-41842/41845/41850: 7.0.7 → 7.0.8 -->
+    <spring-framework.version>7.0.8</spring-framework.version>
   </properties>
 
   <dependencyManagement>
@@ -49,17 +59,6 @@
         <groupId>org.springdoc</groupId>
         <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         <version>3.0.0</version>
-      </dependency>
-      <!-- Trivy HIGH CVE fix: jackson-databind version override -->
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>2.21.4</version>
-      </dependency>
-      <dependency>
-        <groupId>tools.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>3.1.4</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

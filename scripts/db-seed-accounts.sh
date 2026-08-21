@@ -58,7 +58,9 @@ for i in $(seq 2 10); do
   if [ "$RESULT" = "1" ]; then
     log_pass "${ACCOUNT_NO}: inserted (balance=100000.00)"
     INSERTED=$((INSERTED + 1))
-  elif [ "$RESULT" = "2" ]; then
+  elif [ "$RESULT" = "2" ] || [ "$RESULT" = "0" ]; then
+    # ROW_COUNT: 2 = updated (value changed), 0 = already exists with identical values.
+    # Both mean "row present with the desired data" — not a failure.
     log_info "${ACCOUNT_NO}: already exists, reset to balance=100000.00"
     SKIPPED=$((SKIPPED + 1))
   else

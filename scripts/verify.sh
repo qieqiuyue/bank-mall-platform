@@ -91,17 +91,17 @@ echo ""
 echo "── 8. Smoke Test ──"
 bash scripts/smoke-test.sh 2>&1 | tail -4
 
-# ── 9. Jaeger ──
+# ── 9. Tempo (tracing UI) ──
 echo ""
-echo "── 9. Jaeger ──"
-JAEGER_INGRESS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://${NODE_IP}:${NODE_PORT}/jaeger/" 2>/dev/null || echo "000")
-JAEGER_NP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://${NODE_IP}:31686/jaeger/" 2>/dev/null || echo "000")
-if [ "$JAEGER_INGRESS" = "200" ] || [ "$JAEGER_INGRESS" = "302" ]; then
-  pass "Ingress accessible ($JAEGER_INGRESS)"
-elif [ "$JAEGER_NP" = "200" ] || [ "$JAEGER_NP" = "302" ]; then
-  warn "Ingress=$JAEGER_INGRESS, NodePort=$JAEGER_NP (In  gress broken, use :31686)"
+echo "── 9. Tempo ──"
+TEMPO_INGRESS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://${NODE_IP}:${NODE_PORT}/tempo/" 2>/dev/null || echo "000")
+TEMPO_NP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://${NODE_IP}:31686/tempo/" 2>/dev/null || echo "000")
+if [ "$TEMPO_INGRESS" = "200" ] || [ "$TEMPO_INGRESS" = "302" ]; then
+  pass "Ingress accessible ($TEMPO_INGRESS)"
+elif [ "$TEMPO_NP" = "200" ] || [ "$TEMPO_NP" = "302" ]; then
+  warn "Ingress=$TEMPO_INGRESS, NodePort=$TEMPO_NP (Ingress broken, use :31686)"
 else
-  fail "Unreachable — Ingress=$JAEGER_INGRESS, NodePort=$JAEGER_NP"
+  fail "Unreachable — Ingress=$TEMPO_INGRESS, NodePort=$TEMPO_NP"
   FAILS=$((FAILS + 1))
 fi
 

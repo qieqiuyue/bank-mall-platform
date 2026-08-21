@@ -25,7 +25,8 @@ spec:
           type: RuntimeDefault
       containers:
       - name: promtail
-        image: grafana/promtail:2.9.8
+        # A-9: 2.9.8 → 3.4.x to match the Loki upgrade
+        image: grafana/promtail:3.4.2
         imagePullPolicy: IfNotPresent
         args:
         - -config.file=/etc/promtail/promtail.yaml
@@ -40,9 +41,6 @@ spec:
           mountPath: /etc/promtail
         - name: varlog
           mountPath: /var/log
-          readOnly: true
-        - name: varlibdockercontainers
-          mountPath: /var/lib/docker/containers
           readOnly: true
         - name: positions
           mountPath: /run/promtail
@@ -65,8 +63,5 @@ spec:
       - name: varlog
         hostPath:
           path: /var/log
-      - name: varlibdockercontainers
-        hostPath:
-          path: /var/lib/docker/containers
       - name: positions
         emptyDir: {}

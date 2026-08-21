@@ -1,0 +1,12 @@
+# A-8: PDB for the single-replica Ingress Controller — the only north-south
+# entry point, so block disruptive voluntary evictions that would take it down.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ingress-nginx-pdb
+  namespace: ingress-nginx
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx

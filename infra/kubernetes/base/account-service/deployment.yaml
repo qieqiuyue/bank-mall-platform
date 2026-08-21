@@ -23,6 +23,17 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: '8082'
     spec:
+      # A-8: spread replicas of the same service across different nodes where
+      # possible (soft constraint — cluster only has 2 schedulable workers).
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: account-service
+              topologyKey: kubernetes.io/hostname
       volumes:
       - name: otel-agent
         emptyDir: {}

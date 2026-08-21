@@ -76,15 +76,16 @@
 
 ## P2 — 小问题 / 死代码
 
-### P2-1 死代码：PaymentTransactionRepository 未使用方法 `[ ]`
+### P2-1 死代码：PaymentTransactionRepository 未使用方法 `[x]`
 
 - **位置**：`apps/payment-service/src/main/java/com/bank/payment/repository/PaymentTransactionRepository.java:8`（`findByPaymentIdOrderByCreatedAtAsc`）
 - **现象**：方法无任何调用方（grep 确认）
 - **修法**：删除，或补使用（如查询支付的交易流水）
 - **验收点**：编译通过，无死方法告警
 - **来源**：WSL 会话
+- **状态**：✅ **已修复** `b4b07a1`
 
-### P2-2 db-seed-accounts.sh ROW_COUNT 误报 `[ ]`
+### P2-2 db-seed-accounts.sh ROW_COUNT 误报 `[x]`
 
 - **位置**：`scripts/db-seed-accounts.sh:52-64`
 - **现象**：`ON DUPLICATE KEY UPDATE` 的 `ROW_COUNT()` 语义：插入=1、更新=2、**值未变=0**。脚本只处理 1/2，值不变（balance 已是 100000.00）时走 else 误报 FAIL
@@ -92,14 +93,16 @@
 - **修法**：0 视为已存在（成功分支），或改用 `SELECT COUNT(*)` 预判
 - **验收点**：重跑脚本全 PASS
 - **来源**：WSL 会话
+- **状态**：✅ **已修复** `b4b07a1`（0 和 2 均视为已存在）
 
-### P2-3 verify.sh Jaeger 残留 + typo `[ ]`
+### P2-3 verify.sh Jaeger 残留 + typo `[x]`
 
 - **位置**：`scripts/verify.sh:94-106`
 - **现象**：整段仍在检查 `/jaeger/` Ingress 和 NodePort 31686 `/jaeger/` 路径（Tempo 迁移后应为 `/tempo`）；`:102` 有字符串 typo `"In  gress broken"`（双空格）
 - **修法**：改为 Tempo 引用（`/tempo` + `tempo-query`），修 typo
 - **验收点**：verify 脚本对 Tempo 部署返回预期
 - **来源**：WSL 会话
+- **状态**：✅ **已修复** `b4b07a1`（`/tempo` + `TEMPO_*` 变量 + typo 修正）
 
 ---
 

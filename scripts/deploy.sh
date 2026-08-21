@@ -13,7 +13,16 @@ kubectl label namespace monitoring name=monitoring --overwrite 2>/dev/null || tr
 
 echo "[1/12] Applying Sealed Secrets..."
 kubectl apply -f "${K8S_BASE}/sealed-bank-mall.yaml"
-kubectl apply -f "${K8S_BASE}/mysql/secret.yaml"
+# mysql/secret.yaml is gitignored (never committed) — it must be created out-of-band
+# (kubectl create secret or SealedSecret) before this step. Skipping the nonexistent
+# file would fail under `set -euo pipefail`, so we check and warn instead.
+if [ -f "${K8S_BASE}/mysql/secret.yaml" ]; then
+  kubectl apply -f "${K8S_BASE}/mysql/secret.yaml"
+else
+  echo "WARNING: ${K8S_BASE}/mysql/secret.yaml not found (gitignored)."
+  echo "         MySQL deployment reads MYSQL_ROOT_PASSWORD from 'mysql-secret' —"
+  echo "         create it manually if MySQL cannot start."
+fi
 
 echo "[2/12] Deploying MySQL (storage + deployment)..."
 kubectl apply -f "${K8S_BASE}/mysql/storage.yaml"
@@ -57,6 +66,9 @@ kubectl apply -f "${K8S_BASE}/ingress/controller-deploy.yaml"
 kubectl apply -f "${K8S_BASE}/ingress/controller-service.yaml"
 kubectl apply -f "${K8S_BASE}/ingress/ingressclass.yaml"
 kubectl apply -f "${K8S_BASE}/ingress/ingress-rules.yaml"
+
+echo "[9b/12] Deploying Tempo (tracing)..."
+kubectl apply -f "${K8S_BASE}/tempo/"
 
 echo "[10/12] Deploying HPA..."
 kubectl apply -f "${K8S_BASE}/hpa/"

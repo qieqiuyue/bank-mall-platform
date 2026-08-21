@@ -120,8 +120,18 @@ fi
 echo "Committing image tag ${VERSION} to Git..."
 cd "${ROOT_DIR}"
 
-# Update image tags in deployment YAMLs (if needed)
-# ArgoCD watches infra/kubernetes/base/ and auto-syncs on push
+# Update image tags in deployment YAMLs to match the version just built.
+# Only the 4 business-service images (line ~38) are rewritten — the
+# otel-agent-init:latest initContainer (line ~90) is intentionally left alone.
+# ArgoCD watches infra/kubernetes/base/ and auto-syncs on push.
+for svc in auth-service account-service payment-service notification-service; do
+  dep="${K8S_BASE}/${svc}/deployment.yaml"
+  if [ -f "${dep}" ]; then
+    sed -i "s|\(10.0.0.61/bank-mall/${svc}\):[0-9A-Za-z._-]*|\1:${VERSION}|" "${dep}"
+    echo "  [tag] ${svc}: image → :${VERSION}"
+  fi
+done
+
 if git diff --quiet && git diff --cached --quiet; then
   echo "No changes to commit — ArgoCD will maintain current state"
 else

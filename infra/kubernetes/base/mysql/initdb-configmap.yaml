@@ -6,8 +6,9 @@ metadata:
   labels:
     app: mysql
     app.kubernetes.io/part-of: bank-mall
-  # NOTE: Contains DB credentials for initialization only.
-  # In production, use a sealed secret or init-job that reads from K8s Secrets.
+  # NOTE: The bankapp user is created automatically by the MySQL image from the
+  # MYSQL_USER / MYSQL_PASSWORD env vars (seeded from bank-mall-secret), so no
+  # CREATE USER with a literal password is needed here. Only databases + grants.
 data:
   init.sql: |
     CREATE DATABASE IF NOT EXISTS bank_auth DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -17,8 +18,6 @@ data:
     CREATE DATABASE IF NOT EXISTS bank_product DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     CREATE DATABASE IF NOT EXISTS bank_order DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
     CREATE DATABASE IF NOT EXISTS bank_inventory DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-    CREATE USER IF NOT EXISTS 'bankapp'@'%' IDENTIFIED BY '<DB_PASSWORD>';
 
     GRANT ALL PRIVILEGES ON bank_auth.* TO 'bankapp'@'%';
     GRANT ALL PRIVILEGES ON bank_account.* TO 'bankapp'@'%';

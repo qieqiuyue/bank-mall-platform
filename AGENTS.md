@@ -24,6 +24,60 @@
 - 幂等靠 DB 唯一约束 `uk_idempotency` + account 侧 `@Version` 乐观锁重试；payment 幂等 key 前缀 `debit-`/`credit-`/`reverse-`
 - 密钥全走环境变量 + K8s SealedSecret；JWT 密钥启动强校验 ≥256bit
 
+## Spring Boot 4.0.6 破坏性变更表（改依赖前必读）
+
+本项目用 **Spring Boot 4.0.6**（Spring Framework 7.0），**不是 SB 3.x**。
+
+| SB 3.x 写法 | SB 4.0.6 替代 | 影响范围 |
+|------------|-------------|---------|
+| `RestTemplate` / `WebClient.block()` | `RestClient`（同步，`RestClient.builder()` 手动创建） | payment → account HTTP 调用 |
+| `@MockBean` / `@WebMvcTest` | 已移除，改用 `MockMvcBuilders.standaloneSetup()` + `Mockito.mock()` | 所有单元测试 |
+| `RestClientCustomizer` | 已移除，改用 `RestClient.Builder` 直接创建 Bean | auth-service `RestClientConfig.java` |
+| spring-security 全家桶 | 只引 `spring-security-crypto`（`BCryptPasswordEncoder`） | auth-service |
+| springdoc-openapi v2.x | **必须用 v3.0.0** | 4 服务 Swagger UI |
+| `@MockitoBean` | SB 3.4+ 引入但 4.0 已改，直接用 `Mockito.mock()` | 测试 |
+
+**结论**：任何导入 `org.springframework.boot.web.client` 或 spring-security 全家桶的操作需先对照此表。
+
+## Monorepo 边界（改 common-lib 必读）
+
+- `apps/` 下 5 个 Maven 模块：`common-lib` + 4 服务；common-lib 是零 Spring 依赖共享内核
+- **改 `common-lib` 必须 4 处同步**（漏一个就爆炸）：
+  1. 父 POM `apps/pom.xml` 的 `<modules>` 列表
+  2. 依赖服务 POM 加 `<dependency>com.bank:common-lib`
+  3. 每个 Dockerfile：builder sed 掉父 POM `<modules>` 块 → `mvn install -N` 父 → `mvn install` common-lib → `mvn package` 服务
+  4. CI workflow 构建顺序：`mvn install -pl common-lib -am -DskipTests` 必须先跑
+- Dockerfile 模板：builder `maven:3.9-eclipse-temurin-21-alpine`；runtime `eclipse-temurin:21-alpine` + 非 root `appuser` + `HEALTHCHECK /actuator/health/liveness`
+
+## K8s / GitOps
+
+- `infra/kubernetes/base/kustomization.yaml` 只管核心资源，**显式排除**：`sealed-bank-mall.yaml`、`mysql/secret.yaml`、`monitoring/`、`tempo/`、`security/`、`hpa/`、`argocd/`（各自由 deploy.sh step 或 ArgoCD Application 单独 apply）
+- 3 个 ArgoCD Application CR 分拆管理：`bank-mall-apps`（服务+MySQL）、`bank-mall-monitoring`（监控）、`bank-mall-infra`（ingress/security/hpa/configmap/secret）
+- **ArgoCD selfHeal 3 分钟内回滚 `kubectl set/edit`** —— 线上改动必须走 git commit & push
+- `infra/helm/bank-mall/` **NOT FOR DEPLOYMENT** —— 仅骨架，Kustomize base 是唯一权威
+- MySQL 是 StatefulSet（`nodeName: k8s-worker01` + hostPath PV `/data/mysql`）；集群非 HA：1 master + 2 workers + 1 harbor，MySQL/Ingress/Loki/Prometheus 全单点
+- 8 个 SealedSecret key：`DB_PASSWORD`/`DB_USERNAME`/`HARBOR_PASSWORD`/`HARBOR_USERNAME`/`JWT_SECRET_KEY`/`MYSQL_PASSWORD`/`MYSQL_ROOT_PASSWORD`/`MYSQL_USER`
+
+## CI（两条并行 live）
+
+- **Path 1 — GitHub Actions**（`ci.yml`）：gitleaks→semgrep→test→build+trivy hard gate（仅 main，`push:false` 不推镜像）
+- **Path 2 — Internal harbor01**（`scripts/ci.sh`）：真实 CD 路径，Maven test(默认跳过)→package→build+push Harbor→Trivy soft gate→git push 触发 ArgoCD→verify。**唯一实际推送镜像的链路**
+- 注意两路径 gate 强度不一致（GH 硬 vs ci.sh 软），改动时保持对齐
+
+## 测试怪癖
+
+- `MockMvcBuilders.standaloneSetup()` + `Mockito.mock()`（SB 4.0.6 已移除 `@MockBean`/`@WebMvcTest`）
+- `maven-surefire-plugin` 需 `-XX:+EnableDynamicAgentLoading` 适配 JDK 21 的 Mockito（父 POM 已配）
+- `tests/k6/payment-load.js` 路径缺 `/payment` Ingress 前缀，**从未真正跑通**；压测用 `tests/payment-load.sh`
+- 单测 45 个，分布在 7 个测试类（controller+service）
+
+## 安全工具链
+
+- `make lint` = `semgrep --config=auto apps/` + `gitleaks detect --no-git`
+- pre-commit 单 hook：gitleaks v8.30.1
+- `.gitleaks.toml`：allowlist 排除 `docs/.*` / `sealed-*.yaml` / `*.md`（避免 SealedSecret 加密数据误报）
+- 机密约定：`secret.yaml` 永不入 git；真机密通过 SealedSecret 解密注入
+
 ## 已知问题（改动前必读）
 
 - **P0 冲正 bug**：`PaymentService.reverseWithRetry` 把 `"debit-"+idempotencyKey` 当 `originalTransactionNo` 传给 account 侧，而 account 按交易号主键 `TXN...` 查找 → 冲正必失败；`PaymentServiceTest` 固化了错误行为。正确修法：传 `debitResp.getTransactionNo()`
@@ -33,8 +87,10 @@
 
 ## Git 工作区约定
 
-- 本目录是**唯一**开发工作区；WSL `/home/shelton/projects/bank-mall-platform` 是另一台机器上的副本，禁止双工作区分叉开发
+- 本目录是**唯一**开发工作区；WSL `/home/shelton/projects/bank-mall-platform` 是**只读备份**（2026-08-21 归档，资产已迁移），禁止在其开发提交
 - `CLAUDE.md`/`MEMORY.md`/`TECH_AUDIT_REPORT.md`/`GLM_AUDIT_REPORT.md`/`.opencode/`/`.claude/` 被 .gitignore 忽略，只存在于本机，clone 不带
+- 审计文档：`docs/AUDIT_FINAL.md`（REDACT 后已入库）；`docs/audit-private/`（TECH/GLM 报告 + gitignore 说明，gitignored 保持私有）
+- 优化路线图：见 `docs/optimization-roadmap.md`（P0/P1/P2 全量清单，修复后回填状态）
 
 ## 协作约定
 

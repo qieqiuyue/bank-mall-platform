@@ -27,7 +27,8 @@ spec:
       nodeName: k8s-worker01
       containers:
       - name: grafana
-        image: grafana/grafana:10.4.0
+        # A-9: 10.4.0 (outdated) → 11.x LTS-line
+        image: grafana/grafana:11.5.2
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000

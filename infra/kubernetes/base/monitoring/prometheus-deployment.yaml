@@ -28,7 +28,8 @@ spec:
       serviceAccountName: prometheus
       containers:
       - name: prometheus
-        image: prom/prometheus:v2.53.0
+        # A-9: v2.53.0 (outdated) → v3.x
+        image: prom/prometheus:v3.2.1
         imagePullPolicy: IfNotPresent
         args:
         - --config.file=/etc/prometheus/prometheus.yml

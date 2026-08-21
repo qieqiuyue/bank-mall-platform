@@ -44,5 +44,8 @@ data:
         target_label: __path__
         replacement: /var/log/pods/$1/**/*.log
       pipeline_stages:
-      # cri: {} removed — cluster runs containerd, cri parser silently drops logs from containerd runtime.
-      # See: https://grafana.com/docs/loki/latest/send-data/promtail/stages/cri/
+      # A-3: restored the cri stage — the cluster runs containerd and /var/log/pods
+      # files use CRI log format (timestamp / stream / tag prefixes). Without this
+      # stage the prefixes are kept raw in the log line.
+      # Ref: https://grafana.com/docs/loki/latest/send-data/promtail/stages/cri/
+      - cri: {}

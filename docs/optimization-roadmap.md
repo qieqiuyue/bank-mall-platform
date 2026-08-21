@@ -40,12 +40,12 @@
 |---|------|------|----------|------|
 | P2-1 | **结算账户单行热点**：所有支付 credit 到同一 `MALL-SETTLEMENT` 账户，乐观锁冲突率随并发陡增，是确定的扩展瓶颈 | `PaymentService.java:26` | 结算账户分片（N 个结算户按 hash 路由）或引入批量对账 | 本会话独有发现 |
 | P2-2 | **JVM 无 -Xmx + 容器 limit 不一致**：Dockerfile `java -jar` 无内存参数；account/payment/notification limit 512Mi 而 auth 1Gi；OTEL agent 再占几十 MB → OOMKilled 风险 | `apps/*/Dockerfile`、`infra/kubernetes/base/*/deployment.yaml` | Dockerfile 加 `-Xmx` + `-XX:MaxRAMPercentage`；统一 limit 语义；HPA 加内存指标 | 两轮分析 |
-| P2-3 | **promtail 读 docker 路径但集群是 containerd**：`/var/lib/docker/containers` 在 containerd 集群下无日志 → Loki 日志采集为空 | `infra/kubernetes/base/monitoring/promtail-daemonset.yaml:65-71` | 改 containerd 日志路径 `/var/log/containers` + cri 配置 | WSL 分析 |
-| P2-4 | **Grafana 告警失效**：告警 webhook 指向 `localhost:9999` 无服务监听；`GRAFANA_ADMIN_PASSWORD` key 不在 SealedSecret，回落到 admin/admin | `grafana-configmap.yaml:46-51`、`grafana-deployment.yaml:38-43` | 配置真实告警端点（飞书/邮件）；补 SealedSecret 密码 key | WSL 分析 |
-| P2-5 | **HPA 虚设**：`maxReplicas: 3` 在只有 2 个可调度 worker 的集群基本无意义；仅 CPU 指标，payment 是 IO 型 | `infra/kubernetes/base/hpa/*.yaml` | 调整 min/max 匹配节点数；加内存/业务指标；补 podAntiAffinity | WSL 分析 |
+| P2-3 | **promtail 读 docker 路径但集群是 containerd**：~~`/var/lib/docker/containers` 在 containerd 集群下无日志~~（核实：config 实际已用 `/var/log/pods`，残余是 docker 死挂载 + cri stage 被删） | `infra/kubernetes/base/monitoring/promtail-daemonset.yaml` | ✅ **已修复**（第三批 PR）：删除 docker 死挂载、恢复 `cri: {}` stage 解析 containerd 日志格式 | WSL 分析 |
+| P2-4 | **Grafana 告警失效**：告警 webhook 指向 `localhost:9999` 无服务监听；`GRAFANA_ADMIN_PASSWORD` key 不在 SealedSecret 且 SealedSecret 在 `bank-mall` ns、Grafana 在 `monitoring` ns（跨 ns 不可见）→ 回落默认 admin/admin | `grafana-configmap.yaml:40-51`、`grafana-deployment.yaml:38-43` | ✅ **已修复**（第二批 PR）：webhook 改明确占位；新增 `monitoring` ns 的 `grafana-secret` SealedSecret 模板（需集群 kubeseal） | WSL 分析 |
+| P2-5 | **HPA 虚设**：~~`maxReplicas: 3` 在只有 2 个可调度 worker 的集群基本无意义；仅 CPU 指标~~ | `infra/kubernetes/base/hpa/*.yaml` | ✅ **已修复**（第三批 PR）：min1/max2 对齐 2-worker、加内存指标（CPU 70% / 内存 80%） | WSL 分析 |
 | P2-6 | **补偿重试异步化**：同步 HTTP 补偿最多阻塞 ~1s，故障注入下线程池易打满；崩溃后"卡死 PENDING 且幂等 key 被占"无恢复机制 | `PaymentService.java` | 引入 outbox 表 + 定时 reconciliation job 扫 PENDING | 本会话独有发现 |
 | P2-7 | **MySQL 单点无备份验证**：单副本 StatefulSet + hostPath，`db-backup.sh` dump 到 `/tmp` 不落持久存储、无恢复演练 | `mysql/deployment.yaml`、`scripts/db-backup.sh` | 备份落对象存储 + cron + 定期恢复演练；MySQL 上 PDB | WSL 分析 |
-| P2-8 | **Influx 组件版本陈旧**：Loki 2.9.12(EOL)、Grafana 10.4.0、Prometheus 2.53.0 均落后 1-2 个主版本 | `infra/kubernetes/base/monitoring/*` | 升级到 Loki 3.x / Grafana 11.x / Prometheus 3.x（参照 tech-stack-audit.md） | WSL 分析 |
+| P2-8 | **监控组件版本陈旧**：Loki 2.9.12(EOL)、Grafana 10.4.0、Prometheus 2.53.0 均落后 1-2 个主版本 | `infra/kubernetes/base/monitoring/*` | ✅ **已修复**（第三批 PR）：Loki 3.4.2 + promtail 3.4.2、Grafana 11.5.2、Prometheus v3.2.1；Loki schema 同步改 TSDB v13（Loki 3 移除 boltdb-shipper） | WSL 分析 |
 | P2-9 | **Notification DTO/实体命名不一致**（从 bug 清单降级）：`NotificationRequest`/`Response` 用 `channel`/`template`，实体用 `type`/`title`，请求-响应自洽但 DB 语义易困惑 | `NotificationRequest.java`、`NotificationResponse.java`、`Notification.java` | 统一命名（如实体加 `channel`/`template` 字段或 DTO 对齐），**保持 API 响应字段名不变** | 本会话复查 |
 
 ---
@@ -63,6 +63,9 @@
 | common-lib 抽取 | 历史审计整改 |
 | Tempo PVC 属主权限 initContainer | `84f4a82`（PR #46） |
 | 支付冲正传错交易号（P0-1）+ 失败支付发成功通知（P0-2）+ 幂等 race 直出 500（P1-1） | `c1be4e9`（PR #47） |
+| Tempo 部署入口（A-2）+ Tempo Ingress rewrite-target（A-1）+ deploy.sh MySQL secrets（A-6）+ ci.sh tag 回写（A-5） | PR #50 |
+| Grafana 告警 webhook + admin 密码跨 ns（A-4）+ 反亲和/PDB（A-8） | PR #51 |
+| promtail 死挂载删除 + cri stage 恢复（A-3）+ HPA 对齐 2-worker 加内存指标（A-7）+ 监控版本升级 Loki 3.4/Grafana 11.5/Prom 3.2 + Loki TSDB schema（A-9） | 第三批 PR |
 
 ---
 

@@ -1,5 +1,41 @@
 # AGENTS.md
 
+## 项目概览
+
+银行商城微服务平台（教学/演示 + 面试素材）：4 个 Java 21 微服务 + common-lib 共享内核，MySQL 8 一服务一库（Flyway 迁移），K8s（Kustomize base 为部署事实来源）+ ArgoCD + 内网 Harbor(10.0.0.61) 部署，可观测性 Prometheus/Grafana/Loki/Tempo。
+
+- `apps/` — auth(8081)/account(8082)/payment(8083)/notification(8084) + common-lib（`ApiResponse`/`BusinessException`/`ErrorCode`，零 Spring 依赖）
+- `infra/kubernetes/base/` — Kustomize 部署清单（服务/MySQL/Ingress/security/监控/tempo/hpa）；`infra/helm/` 仅为演示骨架
+- `scripts/` — 12 个运维脚本（deploy/preflight/post-boot/recover/ci 等），全部从本机驱动 VM 集群
+- `tests/` — k6 压测 + `payment-load.sh`；`tests/jmeter/` 为空目录
+- `docs/` — 审计报告（TECH/GLM/AUDIT_FINAL）、设计决策、复盘、面试材料
+
+## 常用命令
+
+- 构建: `make build`（⚠️ 直接 `mvn clean package` 依赖本地 .m2 已有 common-lib；全新环境先 `mvn install -pl common-lib -am`）
+- 测试: `make test`（4 服务 JUnit 单测，无集成测试）
+- Lint: `make lint`（semgrep + gitleaks）
+- 部署: `make preflight deploy smoke-test verify`（依赖本机网络 + SSH 到 4 台 VM）
+- CI: GitHub Actions（gitleaks→semgrep→test→build+trivy hard gate，仅 main）；内网 `make ci` 在 harbor01 上跑，是唯一实际推送镜像的链路
+
+## 架构要点
+
+- 服务间全部同步 REST（RestClient，无 MQ）；payment 编排 debit→credit→通知，失败走补偿冲正（3 次指数退避）
+- 幂等靠 DB 唯一约束 `uk_idempotency` + account 侧 `@Version` 乐观锁重试；payment 幂等 key 前缀 `debit-`/`credit-`/`reverse-`
+- 密钥全走环境变量 + K8s SealedSecret；JWT 密钥启动强校验 ≥256bit
+
+## 已知问题（改动前必读）
+
+- **P0 冲正 bug**：`PaymentService.reverseWithRetry` 把 `"debit-"+idempotencyKey` 当 `originalTransactionNo` 传给 account 侧，而 account 按交易号主键 `TXN...` 查找 → 冲正必失败；`PaymentServiceTest` 固化了错误行为。正确修法：传 `debitResp.getTransactionNo()`
+- **P0 零鉴权**：account/payment/notification 无任何 JWT/Filter 校验，debit/credit/payments 接口任何人可调且 Ingress 公网暴露（无 host/TLS）；MySQL 连接 `useSSL=false`
+- **P0 部署断裂**：`deploy.sh` 引用 `mysql/secret.yaml`（被 .gitignore 忽略，干净 clone 上不存在 → 脚本必死）；`initdb-configmap.yaml` 密码是字面 `<DB_PASSWORD>`；Tempo 清单存在但 deploy.sh/kustomization/ArgoCD 三处入口全漏 → trace 链路部署不上
+- **测试资产**：`tests/k6/payment-load.js` 请求路径错（`/api/payments` 应为 `/payment/api/payments`）；`tests/jmeter/` 为空但 ROADMAP 声称有压测
+
+## Git 工作区约定
+
+- 本目录是**唯一**开发工作区；WSL `/home/shelton/projects/bank-mall-platform` 是另一台机器上的副本，禁止双工作区分叉开发
+- `CLAUDE.md`/`MEMORY.md`/`TECH_AUDIT_REPORT.md`/`GLM_AUDIT_REPORT.md`/`.opencode/`/`.claude/` 被 .gitignore 忽略，只存在于本机，clone 不带
+
 ## 协作约定
 
 - **默认多 agent 协同**：涉及 3+ 个独立文件或跨项目操作时，自动并行派 agent

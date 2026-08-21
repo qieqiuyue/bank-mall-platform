@@ -46,6 +46,7 @@
 | P2-6 | **补偿重试异步化**：同步 HTTP 补偿最多阻塞 ~1s，故障注入下线程池易打满；崩溃后"卡死 PENDING 且幂等 key 被占"无恢复机制 | `PaymentService.java` | 引入 outbox 表 + 定时 reconciliation job 扫 PENDING | 本会话独有发现 |
 | P2-7 | **MySQL 单点无备份验证**：单副本 StatefulSet + hostPath，`db-backup.sh` dump 到 `/tmp` 不落持久存储、无恢复演练 | `mysql/deployment.yaml`、`scripts/db-backup.sh` | 备份落对象存储 + cron + 定期恢复演练；MySQL 上 PDB | WSL 分析 |
 | P2-8 | **Influx 组件版本陈旧**：Loki 2.9.12(EOL)、Grafana 10.4.0、Prometheus 2.53.0 均落后 1-2 个主版本 | `infra/kubernetes/base/monitoring/*` | 升级到 Loki 3.x / Grafana 11.x / Prometheus 3.x（参照 tech-stack-audit.md） | WSL 分析 |
+| P2-9 | **Notification DTO/实体命名不一致**（从 bug 清单降级）：`NotificationRequest`/`Response` 用 `channel`/`template`，实体用 `type`/`title`，请求-响应自洽但 DB 语义易困惑 | `NotificationRequest.java`、`NotificationResponse.java`、`Notification.java` | 统一命名（如实体加 `channel`/`template` 字段或 DTO 对齐），**保持 API 响应字段名不变** | 本会话复查 |
 
 ---
 
@@ -61,6 +62,7 @@
 | 探针改 Actuator /health/liveness | 历史审计整改 |
 | common-lib 抽取 | 历史审计整改 |
 | Tempo PVC 属主权限 initContainer | `84f4a82`（PR #46） |
+| 支付冲正传错交易号（P0-1）+ 失败支付发成功通知（P0-2）+ 幂等 race 直出 500（P1-1） | `c1be4e9`（PR #47） |
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## P0 — 资金安全 / 数据一致性（优先修）
 
-### P0-1 支付冲正必失败（传错 originalTransactionNo）`[ ]`
+### P0-1 支付冲正必失败（传错 originalTransactionNo）`[x]`
 
 - **位置**：`apps/payment-service/src/main/java/com/bank/payment/service/PaymentService.java:146`
 - **现象**：`reverseWithRetry` 把 `"debit-"+idempotencyKey` 当 `originalTransactionNo` 传给 account-service。account 侧 `AccountService.reverse()` 用 `txnRepo.findById()` 按**交易号主键**（`TXN+时间戳+纳秒` 格式，`Transaction.java:11-13`）查找 → `"debit-<key>"` 永远查不到 → 冲正必失败 → 扣款成功 + 入账失败的支付全部落 `ERROR_MANUAL_REVIEW`，需人工介入
@@ -17,8 +17,9 @@
 - **测试影响（关键）**：`PaymentServiceTest.java:82` mock `when(accountClient.reverse(eq("A1001"), eq("debit-KEY-002"), eq("KEY-002")))` **固化了错误行为**，修复后此断言必挂。必须重写为传真实交易号（如 `TXN...`），并补"冲正使用 debit 真实交易号"的断言
 - **验收点**：mock 冲正调用参数 = `debitResp.getTransactionNo()`；`processPayment_creditFails_reverseSucceeds` 测试绿
 - **来源**：历史审计 CODE-04 / WSL 会话 / Windows 会话
+- **状态**：✅ **已修复** `c1be4e9`（PR #47）
 
-### P0-2 失败支付仍发成功通知 `[ ]`
+### P0-2 失败支付仍发成功通知 `[x]`
 
 - **位置**：`PaymentService.java:127-133`
 - **现象**：通知调用在 catch 之外、不检查支付 status，`FAILED` / `ERROR_MANUAL_REVIEW` 的支付照样发送 `PAYMENT_SUCCESS` 模板——用户收到"交易成功"而实际失败
@@ -27,12 +28,13 @@
 - **测试影响**：`PaymentServiceTest` 补断言：FAILED 状态不调用/不发送成功通知
 - **验收点**：FAILED 支付的通知模板 ≠ `PAYMENT_SUCCESS`
 - **来源**：Windows 会话独有发现
+- **状态**：✅ **已修复** `c1be4e9`（PR #47）
 
 ---
 
 ## P1 — 功能错误
 
-### P1-1 幂等并发 race 直出 500 `[ ]`
+### P1-1 幂等并发 race 直出 500 `[x]`
 
 - **位置**：`PaymentService.java:59-72`（幂等检查）→ `:85`（`paymentRepo.save(payment)` 在 try 块**外**）
 - **现象**：同 `idempotencyKey` 两个并发请求同时通过 `findByIdempotencyKey` 检查 → 后写者 `save(payment)` 撞 `uk_idempotency` 唯一约束 → `DataIntegrityViolationException` 直出 500（应返回"已处理"语义）
@@ -41,16 +43,14 @@
 - **测试影响**：补并发/重复提交测试
 - **验收点**：同 key 二次提交返回 409 而非 500
 - **来源**：Windows 会话独有发现
+- **状态**：✅ **已修复** `c1be4e9`（PR #47），新增 2 个 race 测试用例
 
-### P1-2 NotificationResponse 字段语义错位 `[ ]`
+### P1-2 NotificationResponse 字段语义错位 `[降级]`
 
 - **位置**：`apps/notification-service/src/main/java/com/bank/notification/dto/NotificationResponse.java:18-19`
-- **现象**：`r.channel = n.getType()`、`r.template = n.getTitle()`——字段名与实体属性含义颠倒。`NotificationRequest` 的 `channel`/`template` 在 `NotificationService.send()` 里分别映射到 `type`/`title`（`NotificationService.java:29-30`），响应回读时映射反了
-- **根因**：DTO 字段命名与实体属性语义未对齐
-- **修法**：修正 `from()` 映射：`channel = n.getChannel?`（实体无此字段，需确认）或保持语义一致。**先查消费方**（NotifyController 分页查询的响应是否被前端/其他服务消费）再改
-- **测试影响**：`NotificationServiceTest` / `NotifyControllerTest` 若断言了错位字段需同步
-- **验收点**：响应 `channel`/`template` 与请求语义一致
-- **来源**：WSL 会话 / Windows 会话
+- **复查结论（2026-08-21）**：**非可复现 bug**。请求-响应自洽：`channel`→实体 `type`→响应 `channel`、`template`→实体 `title`→响应 `template`，映射正确还原。这属于 **DTO 与实体字段命名不一致**（`channel`/`template` vs `type`/`title`），直接查 DB 的人会困惑，但 API 行为正确
+- **处理**：从"代码 bug"降级为**命名重构项**，移入 `optimization-roadmap.md` P2 规划（若重构，注意保持 API 响应字段名 `channel`/`template` 不变，避免破坏调用方）
+- **来源**：WSL 会话（初次误判为 bug）
 
 ### P1-3 登录限流失效（Ingress 后全同 IP）`[ ]`
 

@@ -17,7 +17,7 @@
 
 ### A.3 技术栈
 
-**V1 已落地**:Spring Boot 4.0.6（Spring Framework 7.0）、Java 21 LTS、JWT（jjwt 0.12.6）、BCrypt、Spring Data JPA、Flyway、MySQL 8.0、RestClient、Docker、containerd、Calico、Kubernetes 1.36、Ingress Nginx、ConfigMap、Sealed Secrets、HPA、NetworkPolicy、PodSecurity、Prometheus、Grafana、Loki、Promtail、Jaeger 1.60、OpenTelemetry Java Agent（OTLP）、ArgoCD、Helm、Kustomize、Harbor、GitHub Actions、Trivy、Semgrep、Gitleaks、VMware、Linux、Shell。
+**V1 已落地**:Spring Boot 4.0.6（Spring Framework 7.0）、Java 21 LTS、JWT（jjwt 0.12.6）、BCrypt、Spring Data JPA、Flyway、MySQL 8.0、RestClient、Docker、containerd、Calico、Kubernetes 1.36、Ingress Nginx、ConfigMap、Sealed Secrets、HPA、NetworkPolicy、PodSecurity、Prometheus、Grafana、Loki、Promtail、Tempo（Jaeger 1.60 EOL 后迁移）、OpenTelemetry Java Agent（OTLP）、ArgoCD、Helm、Kustomize、Harbor、GitHub Actions、Trivy、Semgrep、Gitleaks、VMware、Linux、Shell。
 
 **V2 已设计**:Spring Security、Redis、Kyverno、Velero、Kubecost、Argo Rollouts、Keepalived、etcd 备份、阿里云（ACK / ACR / RDS / SLB）。
 
@@ -28,11 +28,11 @@
 ### A.5 已落地亮点（V1 ✅）
 
 - **服务层**：4 微服务 + common-lib 共享内核 + 统一 ApiResponse 契约；BCrypt + JWT utility 鉴权；RestClient 补偿事务（3 次指数退避）+ DB UNIQUE 幂等。
-- **部署层**：K8s Deployment/HPA（min=2/max=3）/PDB/NetworkPolicy 零信任；SealedSecret 8 加密 key；多阶段非 root Dockerfile + HEALTHCHECK；Ingress 4 服务路径 rewrite（无 host,IP-only 实验室）。
-- **可观测性**：Prometheus + Grafana dashboard + 3 告警 + Loki + Promtail + Jaeger 1.60 OTLP（OTEL Java Agent initContainer 注入,3 约束故事）。
+- **部署层**：K8s Deployment/HPA（min=1/max=2，CPU 70% + 内存 80%）/PDB/NetworkPolicy 零信任；SealedSecret 8 加密 key；多阶段非 root Dockerfile + HEALTHCHECK；Ingress 4 服务路径 rewrite（无 host,IP-only 实验室）。
+- **可观测性**：Prometheus + Grafana dashboard + 3 告警 + Loki + Promtail + Tempo OTLP（Jaeger 1.60 EOL 后迁移;OTEL Java Agent initContainer 注入,3 约束故事）。
 - **GitOps**：ArgoCD 3 Application CR 自动 sync + selfHeal 3 分钟回滚。
 - **CI/CD**：GitHub Actions 5 job（Trivy 硬门禁 `--exit-code 1`)+ harbor01 ci.sh 6 阶段 211s（Trivy 软门禁 + GFW 适配）+ Feishu webhook。
-- **韧性**：HPA min=2 + PDB 防止单点;混沌工程 2/3 场景通过(NetworkPolicy 误配 MTTR 5min + Jaeger 慢调用 trace)。
+- **韧性**：HPA min=1/max=2 + PDB 防止单点;混沌工程 2/3 场景通过(NetworkPolicy 误配 MTTR 5min + 慢调用 trace)。
 - **安全**：Gitleaks + Semgrep + Trivy 三轴扫描;Bean Validation 全量;JWT 默认 secret 拒绝;PodSecurity baseline enforce + restricted audit。
 
 ### A.5b V2 已设计待落地（🔵 面试口径:"已设计 / 规划中"）
@@ -45,7 +45,7 @@
 
 ### A.6 量化成果
 
-- 4 微服务 + 45 单测 + 13 文档 + 69 K8s YAML + 29 PR + 191 commits
+- 4 微服务 + 49 单测 + 13 文档 + 67 K8s YAML + 50 PR + 231 commits
 - 5 轮跨引擎审计 → 30/35 findings 修复(5 P2 deferred)
 - CI 端到端 211s(harbor01),Trivy 高危 / 严重零
 - 混沌工程 2/3 场景通过(NetworkPolicy MTTR 5min、Jaeger trace 5 服务上线)
@@ -55,8 +55,8 @@
 ### A.7 项目规模
 
 - 4 个 Spring Boot 微服务 + 1 common-lib 共享内核
-- 45 单元测试（JUnit 5 + Mockito + standaloneSetup）
-- 69 个 K8s manifest YAML（Kustomize base 20 + 监控 / 安全 / HPA / ArgoCD / Ingress 49）
+- 49 单元测试（JUnit 5 + Mockito + standaloneSetup）
+- 67 个 K8s manifest YAML（infra/kubernetes/：base + 监控 / 安全 / HPA / ArgoCD / Ingress / tempo）
 - 13 份活跃技术文档（设计决策 + 故障手册 + 混沌复盘 + HA 设计 + 幂等设计 + 审计报告 + 面试材料等,含未入 git 的 3 份审计报告）
 - 4 台 VMware VM（1 master + 2 worker + 1 harbor,V1 单控制面）
 - 500+ 配置项（K8s manifests + CI/CD pipelines + monitoring dashboards）
@@ -79,13 +79,13 @@ V1（S0–S5.5,已落地 ✅）      → V2 / S6（生产化补齐,已设计待�
 ───────────────────────────── ─────────────────────────────
 4 微服务 + 单控制面集群      → 3 master HA + Velero DR [设计稿]
 基础可观测性(Prom/Grafana/   → OTLP 加 JVM HeapDump + GC 日志 [设计]
-  Loki/Promtail/Jaeger 全栈) → Argo Rollouts 灰度 + ACK 云迁移 [设计]
+  Loki/Promtail/Tempo 全栈) → Argo Rollouts 灰度 + ACK 云迁移 [设计]
 GHA 5 job + ci.sh 6 阶段     → NetworkPolicy 已零信任,Kyverno 策略即代码 [设计]
 NetworkPolicy 零信任 ✅      → Spring Security 运行时鉴权 + common-web [设计]
 JWT + BCrypt utility ✅      → + Redis SETNX 24h 热缓存 [设计稿]
 DB UNIQUE 幂等 ✅            → Kubecost 成本可视化 [设计]
 30/35 审计 finding 修复 ✅   → 集群验证 + squash merge [待办]
-HPA min=2 + PDB ✅           → OOMKill V2 设计 @Profile("chaos") + off-heap [设计]
+HPA min=1/max=2 + PDB ✅      → OOMKill V2 设计 @Profile("chaos") + off-heap [设计]
 OOMKill V1 4 次失败 ✅
 ```
 
@@ -102,7 +102,7 @@ Ingress Nginx (无 host,IP-only 实验室,NodePort 30080)
 
 payment-service → account-service (debit / credit / reverse via RestClient)
 payment-service → notification-service (fire-and-forget via RestClient)
-所有服务 → Jaeger (OTLP gRPC:4317,initContainer 注入 OTEL agent ✅)
+所有服务 → Tempo (tempo-collector, OTLP gRPC:4317,initContainer 注入 OTEL agent ✅)
 所有服务 → MySQL (Flyway 约束 ✅) [+ Redis SETNX 24h 幂等 🔵 V2 设计]
 common-lib 共享 ApiResponse / ErrorCode / BusinessException (zero Spring dependency ✅)
 ```
@@ -116,8 +116,8 @@ common-lib 共享 ApiResponse / ErrorCode / BusinessException (zero Spring depen
 
 ### B.3 K8s 部署与零信任
 
-- **HPA**：min=2 / max=3 / target CPU 70%（min=2 是审计整改后修订,原 min=1 + PDB minAvailable=1 死锁)。
-- **NetworkPolicy**：`deny-all` + 8 个 `allow-*.yaml` 白名单(DNS / Ingress Nginx → 4 服务 / payment → account + notification / MySQL / Monitoring / Jaeger OTLP only)。
+- **HPA**：min=1 / max=2 / CPU 70% + 内存 80% 双指标（max=3 曾在 2-worker 集群没有第 3 调度位，已降；加内存指标因 payment 是 IO 型）。
+- **NetworkPolicy**：`deny-all` + 8 个 `allow-*.yaml` 白名单(DNS / Ingress Nginx → 4 服务 / payment → account + notification / MySQL / Monitoring / Tempo OTLP only)。
 - **ArgoCD 3 App 拆分**：`bank-mall-apps`(服务 + MySQL) + `bank-mall-monitoring`(监控 stack) + `bank-mall-infra`(ingress / security / hpa / configmap / secret),避免单 App 越界同步。
 - **selfHeal 3 分钟回滚**：集群改动必须走 git,`kubectl set/edit` 必被回滚。
 - **MySQL StatefulSet**：单点 nodeName=k8s-worker01 + 10Gi hostPath PV(V1 实验环境);🔵 V2 设计用 nodeAffinity + StorageClass 替代。
@@ -129,7 +129,7 @@ common-lib 共享 ApiResponse / ErrorCode / BusinessException (zero Spring depen
 - **Dashboards**：1 个 Grafana dashboard ConfigMap(`bank-mall-overview.json`),8 panel(Pod CPU / 内存 / JVM GC pause / HTTP 速率 / 健康状态 / JVM 线程数 / p99 响应 / Pod 数)。🔵 V2 设计:补 `bank-mall-business` + `bank-mall-sli-slo` 两个面板。
 - **告警**：3 条(service down 1m critical / high CPU 5m warning / high heap 85% 5m warning)。
 - **Logs**：Loki + Promtail DaemonSet,`cri: {}` parser 已移除(解决 containerd 日志静默丢失的 audit 修复)。
-- **Traces**：Jaeger 1.60 + OTEL Java Agent(S2 已落地 ✅),**initContainer 3 迭代故事**:(1) hostPath 被 PSA baseline 拒 → (2) initContainer wget GitHub 被 GFW 挡 → (3) Harbor image shuttle(`cp` 到 emptyDir),0 代码侵入。
+- **Traces**：Tempo + OTEL Java Agent(S2 落 Jaeger 1.60、后因 2025-12 EOL 迁移 Tempo ✅),**initContainer 3 迭代故事**:(1) hostPath 被 PSA baseline 拒 → (2) initContainer wget GitHub 被 GFW 挡 → (3) Harbor image shuttle(`cp` 到 emptyDir),0 代码侵入。
 - 🔵 **JVM 可观测**(V2 设计)：`-XX:+HeapDumpOnOutOfMemoryError` + GC logs + `jcmd`,Heap dump 用 MAT 离线分析。
 
 ### B.5 GitOps + CI/CD 双路径

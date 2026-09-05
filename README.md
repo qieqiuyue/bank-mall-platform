@@ -1,6 +1,6 @@
 # Bank Mall Cloud-Native Platform
 
-银行电商云原生平台，跑在 4 台 VMware 虚拟机的真实 K8s 集群上。4 个 Spring Boot 微服务（BCrypt+JWT、JPA+乐观锁、RestClient+补偿事务），完整可观测性（Prometheus+Grafana+Loki+Jaeger），NetworkPolicy 零信任安全模型，ArgoCD GitOps 交付。经混沌工程验证：NetworkPolicy 误配、HPA 冷启动风暴、分布式追踪根因分析。
+银行电商云原生平台，跑在 4 台 VMware 虚拟机的真实 K8s 集群上。4 个 Spring Boot 微服务（BCrypt+JWT、JPA+乐观锁、RestClient+补偿事务），完整可观测性（Prometheus+Grafana+Loki+Tempo），NetworkPolicy 零信任安全模型，ArgoCD GitOps 交付。经混沌工程验证：NetworkPolicy 误配、HPA 冷启动风暴、分布式追踪根因分析。
 
 A cloud-native microservices platform running on a real 4-node VMware K8s cluster. Four Spring Boot services with full observability, zero-trust NetworkPolicy, ArgoCD GitOps, and chaos-engineering-validated resilience.
 
@@ -15,16 +15,16 @@ A cloud-native microservices platform running on a real 4-node VMware K8s cluste
 | 指标 | 数值 |
 |------|------|
 | 微服务 | 4（auth, account, payment, notification） |
-| 单元测试 | 45 |
-| K8s 资源 | 16（含监控/安全/网络策略） |
+| 单元测试 | 49 |
+| K8s 清单 | 67 个 YAML（infra/kubernetes/，含监控/安全/网络策略） |
 | 活跃文档 | 13 篇（47 篇归档至 Git 历史） |
 | CI/CD 全流程 | 211 秒（harbor01 `bash scripts/ci.sh`） |
-| PR 合并 | 20 |
-| Git commits | 153 |
+| PR 合并 | 50 |
+| Git commits | 231 |
 | 版本 Tags | 2（v1.0.0-s3, v1.0.0-s4） |
 | 运维 Skill | 9 个 |
 | 集群节点 | 4 台 VMware VM（1 master + 2 worker + 1 harbor） |
-| 故障演练场景 | 2/3 通过（NetworkPolicy 误配 + Jaeger trace 验证） |
+| 故障演练场景 | 2/3 通过（NetworkPolicy 误配 + 链路追踪根因验证） |
 
 ## 交付总结 / Delivery Journey
 
@@ -129,7 +129,7 @@ bank-mall-platform/
 │   ├── payment-service/               # RestClient + compensation + idempotency
 │   └── notification-service/          # Notification persistence
 ├── infra/                             # Infrastructure as Code
-│   ├── kubernetes/base/               # K8s manifests (deployments, services, ingress, monitoring, security, hpa, jaeger)
+│   ├── kubernetes/base/               # K8s manifests (deployments, services, ingress, monitoring, security, hpa, tempo)
 │   ├── kubernetes/cloud/              # Kustomize overlay for ACK cloud (LB ingress, no OTEL)
 │   ├── kubernetes/argocd/             # ArgoCD Application CRs
 │   ├── helm/bank-mall/                # Helm Chart skeleton (V1: Kustomize is source of truth)

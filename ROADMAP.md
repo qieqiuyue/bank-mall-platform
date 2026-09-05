@@ -56,7 +56,7 @@
 
 ### S4：Chaos Engineering & Load Testing ✅ Complete
 
-- [x] JMeter load test — baseline 50/100/200 concurrent ✅（2545/3332/3637 成功）
+- [x] Load test — 50/100/200 并发基线 ✅（2545/3332/3637 成功，经 tests/payment-load.sh）
 - [x] Preflight — test accounts (×10) + DB baseline backup + Jaeger fix + Grafana SLO 验证
 - [x] Extended load — 100/200 concurrent + HPA 扩容观察 + 冷启动死亡螺旋复盘 ✅
 - [x] Scenario 1: OOMKilled — 已删除（SB 4.0.6 + OTEL agent ≥320Mi, V2 混沌工程规划）

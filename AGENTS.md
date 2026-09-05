@@ -7,7 +7,7 @@
 - `apps/` — auth(8081)/account(8082)/payment(8083)/notification(8084) + common-lib（`ApiResponse`/`BusinessException`/`ErrorCode`，零 Spring 依赖）
 - `infra/kubernetes/base/` — Kustomize 部署清单（服务/MySQL/Ingress/security/监控/tempo/hpa）；`infra/helm/` 仅为演示骨架
 - `scripts/` — 12 个运维脚本（deploy/preflight/post-boot/recover/ci 等），全部从本机驱动 VM 集群
-- `tests/` — k6 压测 + `payment-load.sh`；`tests/jmeter/` 为空目录
+- `tests/` — k6 压测 + `payment-load.sh`（`tests/jmeter/` 已删除）
 - `docs/` — 审计报告（TECH/GLM/AUDIT_FINAL）、设计决策、复盘、面试材料
 
 ## 常用命令
@@ -68,8 +68,8 @@
 
 - `MockMvcBuilders.standaloneSetup()` + `Mockito.mock()`（SB 4.0.6 已移除 `@MockBean`/`@WebMvcTest`）
 - `maven-surefire-plugin` 需 `-XX:+EnableDynamicAgentLoading` 适配 JDK 21 的 Mockito（父 POM 已配）
-- `tests/k6/payment-load.js` 路径缺 `/payment` Ingress 前缀，**从未真正跑通**；压测用 `tests/payment-load.sh`
-- 单测 45 个，分布在 7 个测试类（controller+service）
+- `tests/k6/payment-load.js` 路径已修复（`/payment/api/payments`，PR #48）；压测可用 k6 或零依赖的 `tests/payment-load.sh`
+- 单测 49 个，分布在 8 个测试类（controller/service/util）
 
 ## 安全工具链
 
@@ -80,10 +80,10 @@
 
 ## 已知问题（改动前必读）
 
-- **P0 冲正 bug**：`PaymentService.reverseWithRetry` 把 `"debit-"+idempotencyKey` 当 `originalTransactionNo` 传给 account 侧，而 account 按交易号主键 `TXN...` 查找 → 冲正必失败；`PaymentServiceTest` 固化了错误行为。正确修法：传 `debitResp.getTransactionNo()`
-- **P0 零鉴权**：account/payment/notification 无任何 JWT/Filter 校验，debit/credit/payments 接口任何人可调且 Ingress 公网暴露（无 host/TLS）；MySQL 连接 `useSSL=false`
-- **P0 部署断裂**：`deploy.sh` 引用 `mysql/secret.yaml`（被 .gitignore 忽略，干净 clone 上不存在 → 脚本必死）；`initdb-configmap.yaml` 密码是字面 `<DB_PASSWORD>`；Tempo 清单存在但 deploy.sh/kustomization/ArgoCD 三处入口全漏 → trace 链路部署不上
-- **测试资产**：`tests/k6/payment-load.js` 请求路径错（`/api/payments` 应为 `/payment/api/payments`）；`tests/jmeter/` 为空但 ROADMAP 声称有压测
+- ~~**P0 冲正 bug**~~ **已修复**（`c1be4e9`，PR #47）：`reverseWithRetry` 曾把 `"debit-"+idempotencyKey` 当 `originalTransactionNo` 传给 account 侧 → 冲正必失败；现传 `debitResp.getTransactionNo()`，测试契约已重写
+- **P0 零鉴权（仍未修）**：account/payment/notification 无任何 JWT/Filter 校验，debit/credit/payments 接口任何人可调且 Ingress 公网暴露（无 host/TLS）；MySQL 连接 `useSSL=false`
+- ~~**P0 部署断裂**~~ **已修复**（`08b06a4`，PR #50）：deploy.sh 对 gitignored `mysql/secret.yaml` 缺失降级为 warn、MySQL 改读 SealedSecret `bank-mall-secret`、initdb 删字面占位符；Tempo 部署入口补全（deploy.sh step `kubectl apply tempo/` + ArgoCD infra include tempo/ + `tempo/namespace.yaml`）
+- **测试资产**：k6 路径已修复（PR #48 加 `/payment` 前缀，2026-09-05 实测确认）；`tests/jmeter/` 已删除，ROADMAP 的 JMeter 声明已校正为 payment-load.sh
 
 ## Git 工作区约定
 

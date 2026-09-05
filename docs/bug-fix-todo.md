@@ -52,7 +52,7 @@
 - **处理**：从"代码 bug"降级为**命名重构项**，移入 `optimization-roadmap.md` P2 规划（若重构，注意保持 API 响应字段名 `channel`/`template` 不变，避免破坏调用方）
 - **来源**：WSL 会话（初次误判为 bug）
 
-### P1-3 登录限流失效（Ingress 后全同 IP）`[ ]`
+### P1-3 登录限流失效（Ingress 后全同 IP）`[x]`
 
 - **位置**：`apps/auth-service/src/main/java/com/bank/auth/controller/AuthController.java:51`（`request.getRemoteAddr()`）、`apps/auth-service/src/main/java/com/bank/auth/service/LoginRateLimiter.java`
 - **现象**：① 集群经 Ingress 代理，`getRemoteAddr()` 全是 Ingress Pod IP → **所有用户共享一个限流 key**（10 次/60s 全集群用），暴力破解防护形同虚设；② 限流器内存态，多副本各自独立；③ `store` 只在访问时惰性驱逐，被刷的 IP 永不清理 → 内存无限膨胀
@@ -61,8 +61,9 @@
 - **测试影响**：`AuthControllerTest` 限流用例需同步（mock header 而非 RemoteAddr）
 - **验收点**：不同 XFF IP 独立计数；同一 IP 超限被拒；内存不随刷 IP 增长
 - **来源**：Windows 会话 / WSL 会话
+- **状态**：✅ **已修复** `ff18120`（PR #48）——2026-09-05 代码复核确认（`AuthController#getClientIp` XFF 末尾解析 + 账号级锁定）
 
-### P1-4 k6 压测路径错（从未跑通）`[ ]`
+### P1-4 k6 压测路径错（从未跑通）`[x]`
 
 - **位置**：`tests/k6/payment-load.js:47`
 - **现象**：请求 `${BASE_URL}/api/payments`，但 Ingress 前缀是 `/payment`（`ingress-rules.yaml:36-38`）→ 压测请求全部 404，**该脚本从未真正跑通**
@@ -71,6 +72,7 @@
 - **测试影响**：无（脚本类）
 - **验收点**：脚本对部署环境跑通（200/非 404）
 - **来源**：历史审计 DOC-003/OPS-008 / WSL 会话
+- **状态**：✅ **已修复** `ff18120`（PR #48）——2026-09-05 实测 `payment-load.js:47` 已带 `/payment` 前缀
 
 ---
 

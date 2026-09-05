@@ -30,7 +30,7 @@
 | P1-3 | **登录限流形同虚设**：`request.getRemoteAddr()` 在 Ingress 后全是 Ingress Pod IP（所有用户共享一个限流 key）；内存态多副本独立；`store` 无主动清理（被刷 IP 内存膨胀） | `apps/auth-service/.../LoginRateLimiter.java` | 改用 `X-Forwarded-For` + 可信代理白名单；加账号级失败计数与锁定；定时清理过期窗口；或用 Redis 集中限流 | 本会话独有发现 / WSL 分析 |
 | P1-4 | **Tempo 三处部署入口全漏**：`base/tempo/` 清单存在，但 deploy.sh、base/kustomization、ArgoCD exclude 三处都未包含 → 追踪链路实际部署不上。注：端口链路本身正常（`tempo-query` Service `targetPort: 3200` 桥接 16686→3200），真正的断点是 Tempo 未部署 + Ingress 缺 rewrite-target | `scripts/deploy.sh`、`infra/kubernetes/base/kustomization.yaml`、`bank-mall-apps.yaml:16` | ✅ **已修复**（第一批 PR）：deploy.sh 加 apply tempo/、补 namespace.yaml、ArgoCD include tempo/、Ingress 加 rewrite-target | WSL 分析 / 本会话 |
 | P1-5 | **Jaeger 迁移残留**：verify.sh/ci.sh 仍查 `jaeger` namespace 和 `/jaeger/` 路径；`allow-services-ingress-minus-payment.yaml` 演练文件残留 | `scripts/verify.sh:94-106`、`scripts/ci.sh:171-172`、`infra/kubernetes/base/security/` | 清理为 Tempo 引用；删除 minus-payment 演练文件；`infra/dashboards/*.json` 孤儿文件挂载或删除 | WSL 分析 |
-| P1-6 | **测试资产损坏**：`tests/k6/payment-load.js:47` 请求 `/api/payments`（应为 `/payment/api/payments`）；`tests/jmeter/` 空目录但 ROADMAP 声称有压测 | `tests/k6/payment-load.js`、`tests/jmeter/` | 修 k6 路径；补齐 jmeter 脚本或修正 ROADMAP 声明 | WSL 分析 |
+| P1-6 | ~~测试资产损坏~~ **已解决（2026-09-05 复核）**：k6 路径已修（PR #48 加 `/payment` 前缀，实测 `payment-load.js:47` 正确）；jmeter 已删除、ROADMAP 声明已校正 | — | 无剩余动作 | WSL 分析 |
 
 ---
 

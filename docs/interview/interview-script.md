@@ -117,7 +117,7 @@
 >
 > **高可用规划**：V1 是 1 master + 2 worker 实验集群；生产方案是 3 master + HAProxy + Keepalived，etcd 定期快照备份
 > **安全**：NetworkPolicy 限制服务间通信、RBAC 权限最小化、Pod Security Standards
-> **可观测性**：Prometheus + Grafana 监控、Grafana Alerting、Loki/Promtail 日志采集、Jaeger 1.60 + OTEL Java Agent 链路追踪(均已落地 S2 ✅)
+> **可观测性**：Prometheus + Grafana 监控、Grafana Alerting、Loki/Promtail 日志采集、Tempo + OTEL Java Agent 链路追踪（S2 落 Jaeger 1.60，后因 2025-12 EOL 迁移 Tempo ✅）
 > **存储**：对接 Ceph/Longhorn，实现有状态服务的数据持久化
 > **CI/CD**：ArgoCD GitOps 流水线，实现代码提交到生产部署的自动化
 
@@ -136,7 +136,7 @@
 | 集群拓扑？ | 1 master + 2 worker + 1 Harbor，Ubuntu 24.04 |
 | 镜像怎么构建？ | 多阶段 Dockerfile，maven 编译 → temurin 运行，180MB |
 | K8s 清单有什么？ | Deployment + Service + ConfigMap + Secret + HPA |
-| 探针怎么配？ | liveness 30s 延迟，readiness 10s 延迟，/api/<service>/health |
+| 探针怎么配？ | Actuator 分离端点：/actuator/health/liveness + /readiness，慢启动加 startupProbe（30×10s） |
 | 资源限制？ | requests 100m/256Mi，limits 500m/512Mi |
 | 怎么解决镜像拉取失败？ | 阿里云镜像站 + 手动 ctr pull --plain-http |
 | 生产还缺什么？ | 多 master 高可用、生产级存储、Redis、AlertManager HA、Velero DR、Kyverno 策略 |
@@ -171,7 +171,7 @@
 
 "100 并发压测时成功率只有 6.3%。503 占了 93%。这不是业务代码有问题——是 K8s 层面的容量问题。HPA 检测到 CPU 飙升触发扩容，但新 Pod 启动需要 60 秒（JPA + Flyway + Hibernate）。这 60 秒里流量全打在老 Pod 上，老 Pod CPU 打满 → 重启 → 更少健康后端 → 更多 503 → 恶性循环。200 并发反而成功率 84%——因为 JIT 在前一轮压测中预热了，热点代码编译成 native code 后每个请求处理速度快了一个数量级。这个案例说明两个事：第一，HPA 扩容的冷启动窗口是最危险的时候——生产环境必须 min=2 副本加 PDB；第二，Java 服务的 JIT 预热不能忽视——200 并发比 100 并发成功率高 13 倍，完全是预热导致的。"
 
-### 案例 3：Jaeger 慢调用 trace — P99 飙升到 5000ms
+### 案例 3：慢调用 trace — P99 飙升到 5000ms（Jaeger 时代案例，Tempo 同样操作）
 
 "我们有一个端到端 trace 验证——冷启动 account-service 然后立即打流量。在 Jaeger UI 里选 payment-service，按 Duration 降序排列，最慢的一条 trace 总耗时 5300ms 但实际业务逻辑只跑了 50ms。展开 span tree 发现 `AccountClient.debit` 这个 span 占了 5000ms——点进去是 account-service 冷启动时的 JPA 初始化。分布式追踪的价值就在这里：不看代码、不看日志，直接定位到瓶颈所在的微服务和具体方法。V2 计划用 `@Profile('chaos')` 注入延迟来做更可控的慢调用演示。"
 

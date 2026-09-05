@@ -70,33 +70,20 @@ else
 fi
 echo ""
 
-# --- Jaeger/Tempo pods ---
-echo ">>> kubectl get pods -n jaeger (Tempo)"
-if kubectl get pods -n jaeger 2>/dev/null | grep -q .; then
-    kubectl get pods -n jaeger 2>/dev/null || true
-    jaeger_not_ready=$(kubectl get pods -n jaeger --no-headers 2>/dev/null | grep -vc 'Running' || echo "0")
-    if [ "${jaeger_not_ready}" -eq 0 ]; then
-        echo -e "[JAEGER] ${GREEN}OK${NC} — all pods Running"
+# --- Tempo pods (namespace: tempo) ---
+echo ">>> kubectl get pods -n tempo (Tempo)"
+if kubectl get pods -n tempo 2>/dev/null | grep -q .; then
+    kubectl get pods -n tempo 2>/dev/null || true
+    tempo_not_ready=$(kubectl get pods -n tempo --no-headers 2>/dev/null | grep -vc 'Running' || echo "0")
+    if [ "${tempo_not_ready}" -eq 0 ]; then
+        echo -e "[TEMPO] ${GREEN}OK${NC} — all pods Running"
         ok=$((ok + 1))
     else
-        echo -e "[JAEGER] ${YELLOW}WARN${NC} — ${jaeger_not_ready} pod(s) not Running"
+        echo -e "[TEMPO] ${YELLOW}WARN${NC} — ${tempo_not_ready} pod(s) not Running"
         warn=$((warn + 1))
     fi
 else
-    echo "[JAEGER] namespace empty or not found — checking monitoring namespace..."
-    if kubectl get pods -n monitoring -l app=tempo 2>/dev/null | grep -q .; then
-        kubectl get pods -n monitoring -l app=tempo 2>/dev/null || true
-        tempo_not_ready=$(kubectl get pods -n monitoring -l app=tempo --no-headers 2>/dev/null | grep -vc 'Running' || echo "0")
-        if [ "${tempo_not_ready}" -eq 0 ]; then
-            echo -e "[TEMPO(monitoring)] ${GREEN}OK${NC} — all pods Running"
-            ok=$((ok + 1))
-        else
-            echo -e "[TEMPO(monitoring)] ${YELLOW}WARN${NC} — ${tempo_not_ready} pod(s) not Running"
-            warn=$((warn + 1))
-        fi
-    else
-        echo -e "[TEMPO] ${YELLOW}SKIP${NC} — not deployed"
-    fi
+    echo -e "[TEMPO] ${YELLOW}SKIP${NC} — namespace empty or not found"
 fi
 echo ""
 

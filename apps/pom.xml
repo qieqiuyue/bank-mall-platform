@@ -24,7 +24,8 @@
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <tomcat.version>11.0.22</tomcat.version>
+    <!-- tomcat-embed-core CVE-2026-65182/65905/68525 (CRITICAL): 11.0.22 → 11.0.25 -->
+    <tomcat.version>11.0.25</tomcat.version>
     <!-- Trivy HIGH CVE fixes — BOM property overrides (align the whole family, not single artifacts) -->
     <!-- jackson-core GHSA-r7wm-3cxj-wff9: 2.21.2 → 2.21.4 (Jackson 2), 3.1.2 → 3.1.4 (Jackson 3) -->
     <jackson-2-bom.version>2.21.4</jackson-2-bom.version>

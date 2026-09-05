@@ -282,22 +282,15 @@ section5() {
         mark_fail "Promtail not ready"
     fi
 
-    # 5e — Tempo (check both jaeger and monitoring namespaces)
+    # 5e — Tempo (namespace: tempo)
     printf "  Tempo wait (300s) ... "
-    local tempo_ns=""
     local tempo_label="app=tempo"
 
-    if kubectl get pods -n jaeger -l "${tempo_label}" 2>/dev/null | grep -q .; then
-        tempo_ns="jaeger"
-    elif kubectl get pods -n monitoring -l "${tempo_label}" 2>/dev/null | grep -q .; then
-        tempo_ns="monitoring"
-    fi
-
-    if [ -n "${tempo_ns}" ]; then
-        if kubectl wait --for=condition=ready pod -n "${tempo_ns}" -l "${tempo_label}" --timeout=300s 2>/dev/null; then
-            mark_pass "Tempo Ready (namespace: ${tempo_ns})"
+    if kubectl get pods -n tempo -l "${tempo_label}" 2>/dev/null | grep -q .; then
+        if kubectl wait --for=condition=ready pod -n tempo -l "${tempo_label}" --timeout=300s 2>/dev/null; then
+            mark_pass "Tempo Ready (namespace: tempo)"
         else
-            mark_fail "Tempo not ready (namespace: ${tempo_ns})"
+            mark_fail "Tempo not ready (namespace: tempo)"
         fi
     else
         mark_skip "Tempo not deployed"

@@ -197,8 +197,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: auth-service
-  minReplicas: 2
-  maxReplicas: 3
+  minReplicas: 1
+  maxReplicas: 2
   metrics:
   - type: Resource
     resource:
@@ -206,6 +206,12 @@ spec:
       target:
         type: Utilization
         averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300
@@ -214,7 +220,7 @@ spec:
 **设计要点**：
 - CPU 阈值 70%：避免频繁扩缩容（阈值太低会导致震荡）
 - scaleDown 冷却 5 分钟：防止流量短暂下降后立即缩容
-- minReplicas=2：保证基础可用性，即使流量低谷也有冗余
+- minReplicas=1/maxReplicas=2：max=3 曾在 2-worker 集群没有第 3 调度位，形同虚设；加内存 80% 指标因 payment 是 IO 型，纯 CPU 从不触发
 
 ### Q13：服务间是怎么通信的？
 
@@ -262,7 +268,7 @@ spec:
 2. **持久化存储**：对接 NFS/Ceph/Longhorn，Pod 重建后数据不丢失
 3. **安全加固**：NetworkPolicy 限制服务间通信、RBAC 权限最小化、Pod Security Standards
 4. **CI/CD**：GitLab CI / Jenkins / ArgoCD 实现自动化构建和发布
-5. **可观测性**：V1 已落地 Prometheus + Grafana 监控、Grafana Alerting、Loki/Promtail 日志采集、**Jaeger 1.60 + OTEL Java Agent 链路追踪**(S2 ✅ 已落地,initContainer 注入,OTLP gRPC :4317)
+5. **可观测性**：V1 已落地 Prometheus + Grafana 监控、Grafana Alerting、Loki/Promtail 日志采集、**Tempo + OTEL Java Agent 链路追踪**(S2 落 Jaeger 1.60、后因 EOL 迁移 Tempo ✅,initContainer 注入,OTLP gRPC :4317 → tempo-collector:4317)
 6. **灾难恢复**：etcd 定期快照备份、Velero 集群备份、跨可用区部署
 
 ## 进阶追问

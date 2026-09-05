@@ -181,7 +181,7 @@
 ## 第 7 章：简历 bullet（两版）
 
 ### 后端版（Java 后端岗）
-1. 独立设计 4 微服务银行商城（Spring Boot 4.0.6/Java 21/MySQL 8），**补偿 Saga 支付链路**（debit→credit→reverse 3 次指数退避）+ DB UNIQUE 幂等 + 乐观锁，47 单测全绿
+1. 独立设计 4 微服务银行商城（Spring Boot 4.0.6/Java 21/MySQL 8），**补偿 Saga 支付链路**（debit→credit→reverse 3 次指数退避）+ DB UNIQUE 幂等 + 乐观锁，49 单测全绿
 2. 修复支付冲正 P0 bug（传错 originalTransactionNo）+ 幂等并发 race（撞约束映射 409）+ 失败支付误发成功通知，测试同步重写杜绝契约固化
 3. 登录限流加固：XFF 真实 IP 解析 + 账号级锁定（5 次/15 分钟），修复 Ingress 代理后全用户共享限流 key 问题
 4. 升级 5 个 BOM 清零 9 个 Trivy HIGH CVE（jackson/micrometer/spring-data/spring-framework），CI 硬门禁通过

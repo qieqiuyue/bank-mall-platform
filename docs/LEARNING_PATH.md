@@ -29,7 +29,7 @@ ssh root@10.0.0.61   # harbor01（构建节点）
 # 2. 看集群状态
 kubectl get nodes
 kubectl get pods -n bank-mall
-kubectl get pods -n jaeger
+kubectl get pods -n tempo
 kubectl get pods -n monitoring
 kubectl get hpa -n bank-mall
 
@@ -59,7 +59,7 @@ bash scripts/verify.sh        # 全量验证（审计修复 30 项）
 | **共享代码** | `apps/common-lib/`（ApiResponse + ErrorCode + BusinessException） |
 | **K8s 部署** | `infra/kubernetes/base/` — 每服务一个目录、MySQL、Ingress、监控、安全 |
 | **CI/CD** | `.github/workflows/ci.yml`（5 job） + `scripts/ci.sh`（harbor01 一键） |
-| **可观测性** | Prometheus `:30090`、Grafana `:30300`、Loki `:30310` |
+| **可观测性** | Prometheus `:30090`、Grafana `:30300`、Loki `:30310`、Tempo UI NodePort `:31686` / Ingress `/tempo` |
 | **网络策略** | `infra/kubernetes/base/security/` — deny-all → whitelist 13 条规则 |
 
 ---
@@ -76,7 +76,7 @@ bash scripts/verify.sh        # 全量验证（审计修复 30 项）
 
 面试话术骨架：
 
-> "我在 4 台 VMware 虚拟机上搭建了一套银行电商云原生平台，包含 4 个 Spring Boot 微服务、MySQL 数据库、Jenkins-less CI/CD 流水线、全链路可观测性（Prometheus + Grafana + Loki + Jaeger）、NetworkPolicy 零信任网络模型和 ArgoCD GitOps 交付。项目经过两轮深度审计——五轮交叉验证 + 主审架构师灾难预演——修复了 30 项安全和工程缺陷。"
+> "我在 4 台 VMware 虚拟机上搭建了一套银行电商云原生平台，包含 4 个 Spring Boot 微服务、MySQL 数据库、Jenkins-less CI/CD 流水线、全链路可观测性（Prometheus + Grafana + Loki + Tempo）、NetworkPolicy 零信任网络模型和 ArgoCD GitOps 交付。项目经过两轮深度审计——五轮交叉验证 + 主审架构师灾难预演——修复了 30 项安全和工程缺陷。"
 
 ---
 
@@ -99,13 +99,13 @@ bash scripts/verify.sh        # 全量验证（审计修复 30 项）
 
 | 坑 | 现象 | 修复 |
 |----|------|------|
-| Calico VM 重启断裂 | Jaeger 跨节点超时 | `kubectl delete pod -n kube-system -l k8s-app=calico-node` |
+| Calico VM 重启断裂 | 跨节点 Pod 超时 | `kubectl delete pod -n kube-system -l k8s-app=calico-node` |
 | Harbor HTTP | `ctr pull` 失败 | 必须加 `--plain-http` |
 | `docker system prune -a -f` | 镜像被清 | 推完再 prune |
 | Maven `settings.xml` 假阿里云 | GFW 阻断 | URL 是 `maven.aliyun.com/repository/public`，不是 `repo.maven.apache.org` |
-| Jaeger Ingress 502 | rewrite 冲突 | 已修：独立 Ingress 资源无 rewrite-target |
+| 追踪 UI Ingress 502 | rewrite 冲突（Jaeger 时代踩坑） | 已修：独立 Ingress 资源无 rewrite-target（Tempo 沿用） |
 | 加新 Maven 模块 | CI 挂 | 见 CLAUDE.md Known Pitfalls #9 |
 
 ---
 
-**最后更新**: 2026-06-09 | 审计修复完成后
+**最后更新**: 2026-09-05 | 文档过时点校正（Tempo/单测数/JMeter）
